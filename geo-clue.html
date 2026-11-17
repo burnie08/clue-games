@@ -434,7 +434,7 @@ function openSettings(first) {
 }
 function setupSteps() {
   return `<div class="help"><p>Geo Clue uses your own Google Maps key. A 5-round game uses about 5 of your 5,000 free Street View loads per month.</p><ol>
-  <li>Go to <a href="https://console.cloud.google.com/google/maps-apis/start" target="_blank">Google Cloud Console → Google Maps Platform</a> and create a project. Google requires billing to be set up, even for free usage.</li>
+  <li>Go to <a href="https://developers.google.com/maps/get-started" target="_blank">Google Maps Platform → Get started</a> (or <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a>) and create a project. Google requires billing to be set up, even for free usage.</li>
   <li>Enable the <b>Maps JavaScript API</b>.</li>
   <li>Under <b>Keys &amp; Credentials</b>, create an API key. Restrict it:<br>• Application restriction: <b>Websites</b> → add your site, e.g. <code>https://your-site.vercel.app/*</code><br>• API restriction: <b>Maps JavaScript API</b> only</li>
   <li>Optional but recommended: set a <b>budget alert</b> (Billing → Budgets &amp; alerts) at $1, and lower the API's daily quota.</li>
