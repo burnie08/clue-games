@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reel Clue</title>
+<style>
+:root{
+  --bg:#0f1117;--panel:#181b24;--panel2:#20242f;--text:#e9ecf2;--muted:#8b93a7;
+  --green:#3a9d4f;--gold:#c79a22;--gray:#343a48;--accent:#e4b343;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:8px 12px;background:var(--panel2);color:var(--text)}
+button:hover:not(:disabled){filter:brightness(1.25)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:#1a1300;font-weight:600}
+input,select{font:inherit;background:var(--panel2);color:var(--text);border:1px solid #2f3442;border-radius:8px;padding:10px 12px;width:100%}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid #232733;flex-wrap:wrap}
+.logo{font-weight:800;font-size:22px;letter-spacing:.5px}
+.logo span{color:var(--accent)}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav button.on{background:var(--accent);color:#1a1300}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;color:var(--muted)}
+.bar b{color:var(--text)}
+#status{color:var(--muted);min-height:20px;margin:6px 0}
+.searchwrap{position:relative}
+#drop{position:absolute;left:0;right:0;top:100%;background:var(--panel);border:1px solid #2f3442;border-radius:8px;margin-top:4px;z-index:20;max-height:420px;overflow:auto;box-shadow:0 10px 30px #0008}
+.opt{display:flex;gap:10px;align-items:center;padding:6px 10px;cursor:pointer}
+.opt.sel,.opt:hover{background:var(--panel2)}
+.opt img,.opt .ph{width:34px;height:51px;object-fit:cover;border-radius:4px;background:#2a2f3c;flex:none}
+.opt small{color:var(--muted)}
+#hints{display:flex;gap:10px;margin:12px 0;flex-wrap:wrap}
+.hint{flex:1;min-width:220px;background:var(--panel);border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center}
+.hint img{width:70px;border-radius:6px;filter:blur(7px)}
+.hint .t{color:var(--muted);font-size:13px}
+.hint q{font-style:italic}
+.labels,.tiles{display:grid;grid-template-columns:1.6fr .8fr 1fr .8fr .8fr 1.1fr 1.1fr 2.4fr;gap:6px}
+.labels{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px;padding:0 2px;margin-top:8px}
+.row{margin:10px 0 14px}
+.rowhead{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:600}
+.rowhead img{width:26px;height:39px;border-radius:3px;object-fit:cover}
+.rowhead small{color:var(--muted);font-weight:400}
+.tile{background:var(--gray);border-radius:8px;min-height:78px;padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;animation:flip .45s both;transform-origin:center top}
+.tile.noanim{animation:none}
+.tile.g{background:var(--green)}
+.tile.y{background:var(--gold)}
+.tile.castTile{background:var(--panel)}
+.tile .lbl{display:none;font-size:10px;text-transform:uppercase;opacity:.75;margin-bottom:2px}
+.tile .val{font-weight:700;font-size:16px;word-break:break-word}
+.tile.small .val{font-size:13px}
+.arr{margin-left:4px;font-size:18px}
+.chips{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+.chip{font-size:11px;font-weight:600;padding:2px 6px;border-radius:10px;background:#0003}
+.chip.hit{background:#fff3;outline:1px solid #fff8}
+.cast{display:flex;gap:6px;justify-content:center;width:100%}
+.actor{display:flex;flex-direction:column;align-items:center;width:20%;font-size:10px;font-weight:500;color:var(--muted)}
+.actor img,.actor .noimg{width:42px;height:42px;border-radius:50%;object-fit:cover;border:3px solid #3d4352;background:#2a2f3c;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text)}
+.actor.g img,.actor.g .noimg{border-color:var(--green)}
+.actor.y img,.actor.y .noimg{border-color:var(--gold)}
+.actor.g,.actor.y{color:var(--text)}
+.actor span{margin-top:2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actor:first-child img,.actor:first-child .noimg{width:48px;height:48px}
+@keyframes flip{0%{transform:rotateX(90deg);opacity:0}100%{transform:rotateX(0);opacity:1}}
+.endcard{display:flex;gap:16px;background:var(--panel);border-radius:12px;padding:16px;margin:12px 0;border:2px solid var(--gray)}
+.endcard.won{border-color:var(--green)}
+.endcard.lost{border-color:#a33}
+.endcard img{width:140px;border-radius:8px;align-self:flex-start}
+.endcard h2{margin:0 0 4px}.endcard h3{margin:0 0 8px;color:var(--accent)}
+.endcard p{color:var(--muted);line-height:1.45}
+.btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal[hidden]{display:none}
+.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow:auto;position:relative}
+.mbox h2{margin-top:0}
+.mbox .close{position:absolute;right:10px;top:10px;background:none;font-size:22px}
+.mbox label{display:block;margin:12px 0 4px;color:var(--muted);font-size:13px}
+.mbox .help{color:var(--muted);font-size:13px;line-height:1.5}
+.stats{display:flex;gap:10px;text-align:center;margin-bottom:16px}
+.stats div{flex:1;background:var(--panel2);border-radius:10px;padding:10px}
+.stats b{display:block;font-size:24px}
+.dist{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:13px}
+.dist .b{background:var(--green);padding:2px 6px;border-radius:4px;min-width:22px;text-align:right}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
+.days button{text-align:left;font-size:13px}
+.days button small{display:block;color:var(--muted)}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0}
+.legend span{padding:3px 8px;border-radius:6px;font-size:13px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#toast.show{opacity:1}
+footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
+@media (max-width:820px){
+  .labels{display:none}
+  .tiles{grid-template-columns:repeat(4,1fr)}
+  .tile:first-child{grid-column:span 4;min-height:44px}
+  .tile.wide{grid-column:span 4}
+  .tile .lbl{display:block}
+  .endcard{flex-direction:column}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Reel<span>Clue</span></div>
+  <nav>
+    <button id="bDaily" class="on">Daily</button>
+    <button id="bUnl">Unlimited</button>
+    <button id="bRewatch">Rewatch</button>
+    <button id="bStats">Stats</button>
+    <button id="bHelp">?</button>
+    <button id="bSettings">⚙</button>
+  </nav>
+</header>
+<main>
+  <div class="bar"><span id="modeLbl"></span><span>Guess <b id="count">0</b>/10</span></div>
+  <div class="searchwrap">
+    <input id="q" placeholder="Search for a movie…" autocomplete="off">
+    <div id="drop" hidden></div>
+  </div>
+  <div id="status"></div>
+  <div id="hints"></div>
+  <div id="end" hidden></div>
+  <div class="labels"><div>Genres</div><div>Year</div><div>Box office</div><div>Score</div><div>Rating</div><div>Studio</div><div>Director</div><div>Cast</div></div>
+  <div id="rows"></div>
+</main>
+<footer>Movie data from <a href="https://www.themoviedb.org/" target="_blank">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB. Personal use. · <a href="tune-clue.html">Play Tune Clue</a></footer>
+<div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
+<div id="toast"></div>
+
+<script>
+// ---------- helpers ----------
+const API = 'https://api.themoviedb.org/3';
+const IMG = 'https://image.tmdb.org/t/p/';
+const MAX = 10;
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const pad = n => String(n).padStart(2, '0');
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function dayNum(key) { const [y, m, d] = key.split('-').map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 864e5); }
+function niceDate(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+function initials(n) { return n.split(' ').map(w => w[0]).slice(0, 2).join(''); }
+function money(v) { if (!v) return 'N/A'; if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B'; if (v >= 1e6) return '$' + Math.round(v / 1e6) + 'M'; return '$' + Math.round(v / 1e3) + 'K'; }
+function setStatus(t) { $('#status').textContent = t; }
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1600); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function shuffled(ids) {
+  const r = mulberry32(20261117), a = ids.slice().sort((x, y) => x - y);
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+// ---------- settings ----------
+let settings = Object.assign({ key: '', region: 'US', poolSize: 500 }, LS.get('rc:settings', {}));
+
+// ---------- TMDB ----------
+async function tmdb(path, params = {}) {
+  const u = new URL(API + path);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  const headers = { accept: 'application/json' };
+  const key = settings.key.trim();
+  if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key; else u.searchParams.set('api_key', key);
+  const r = await fetch(u, { headers });
+  if (!r.ok) throw new Error('TMDB error ' + r.status + (r.status === 401 ? ' (bad API key?)' : ''));
+  return r.json();
+}
+
+async function getPool(force = false) {
+  const p = LS.get('rc:pool', null);
+  if (p && !force && p.size === settings.poolSize && p.ids.length) return p.ids;
+  const pages = Math.ceil(settings.poolSize / 20), ids = [];
+  for (let s = 1; s <= pages; s += 5) {
+    setStatus(`Building film pool… page ${Math.min(s + 4, pages)}/${pages}`);
+    const batch = [];
+    for (let pg = s; pg < Math.min(s + 5, pages + 1); pg++)
+      batch.push(tmdb('/discover/movie', { sort_by: 'vote_count.desc', include_adult: 'false', include_video: 'false', page: pg }));
+    (await Promise.all(batch)).forEach(d => d.results.forEach(m => ids.push(m.id)));
+  }
+  const uniq = [...new Set(ids)];
+  LS.set('rc:pool', { size: settings.poolSize, ids: uniq });
+  setStatus('');
+  return uniq;
+}
+
+const mem = {};
+async function getMovie(id) {
+  const ck = 'rc:m:' + id + ':' + settings.region;
+  if (mem[ck]) return mem[ck];
+  const cached = LS.get(ck, null);
+  if (cached) return (mem[ck] = cached);
+  const d = await tmdb('/movie/' + id, { append_to_response: 'credits,release_dates' });
+  const rel = d.release_dates?.results || [];
+  const cert = cc => {
+    const r = rel.find(x => x.iso_3166_1 === cc); if (!r) return '';
+    const s = r.release_dates.filter(x => x.certification);
+    const pick = s.find(x => x.type === 3) || s[0];
+    return pick ? pick.certification : '';
+  };
+  const cast = (d.credits?.cast || []).slice().sort((a, b) => a.order - b.order);
+  const m = {
+    id: d.id, title: d.title, year: d.release_date ? +d.release_date.slice(0, 4) : null,
+    poster: d.poster_path, genres: (d.genres || []).map(g => g.name).slice(0, 5),
+    revenue: d.revenue || 0, score: Math.round((d.vote_average || 0) * 10),
+    cert: cert(settings.region) || (settings.region !== 'US' ? cert('US') : '') || 'NR',
+    studios: (d.production_companies || []).map(c => c.name),
+    directors: (d.credits?.crew || []).filter(c => c.job === 'Director').map(c => c.name),
+    cast: cast.slice(0, 5).map(c => ({ id: c.id, name: c.name, pic: c.profile_path })),
+    castAll: cast.slice(0, 40).map(c => c.id),
+    tagline: d.tagline || '', overview: d.overview || ''
+  };
+  LS.set(ck, m);
+  return (mem[ck] = m);
+}
+
+// ---------- comparison ----------
+function cmpNum(gv, av, close) {
+  if (gv === av) return { cls: 'g', arrow: '' };
+  return { cls: Math.abs(gv - av) <= close ? 'y' : 'x', arrow: av > gv ? '↑' : '↓' };
+}
+function compare(g, a) {
+  const T = [];
+  // Genres
+  const overlap = g.genres.filter(x => a.genres.includes(x)).length;
+  const same = overlap === g.genres.length && overlap === a.genres.length;
+  const chips = g.genres.map(x => `<span class="chip ${a.genres.includes(x) ? 'hit' : ''}">${esc(x)}</span>`).join('') || '—';
+  T.push({ label: 'Genres', cls: same ? 'g' : overlap ? 'y' : 'x', html: `<div class="chips">${chips}</div>` });
+  // Year
+  if (g.year && a.year) { const c = cmpNum(g.year, a.year, 5); T.push({ label: 'Year', cls: c.cls, html: `${g.year}<span class="arr">${c.arrow}</span>` }); }
+  else T.push({ label: 'Year', cls: 'x', html: g.year || '?' });
+  // Box office
+  let bo;
+  if (!g.revenue && !a.revenue) bo = { cls: 'g', arrow: '' };
+  else if (!g.revenue || !a.revenue) bo = { cls: 'x', arrow: '' };
+  else bo = cmpNum(g.revenue, a.revenue, 1e8);
+  T.push({ label: 'Box office', cls: bo.cls, html: `${money(g.revenue)}<span class="arr">${bo.arrow}</span>` });
+  // Score
+  const sc = cmpNum(g.score, a.score, 5);
+  T.push({ label: 'Score', cls: sc.cls, html: `${g.score}<span class="arr">${sc.arrow}</span>` });
+  // Rating
+  T.push({ label: 'Rating', cls: g.cert === a.cert ? 'g' : 'x', html: esc(g.cert) });
+  // Studio
+  const stc = g.studios[0] && g.studios[0] === a.studios[0] ? 'g' : g.studios.some(s => a.studios.includes(s)) ? 'y' : 'x';
+  T.push({ label: 'Studio', cls: stc, html: esc(g.studios[0] || '—'), small: true });
+  // Director
+  T.push({ label: 'Director', cls: g.directors.some(d => a.directors.includes(d)) ? 'g' : 'x', html: esc(g.directors.join(', ') || '—'), small: true });
+  // Cast
+  let anyG = false, anyY = false;
+  const castHtml = g.cast.map((c, i) => {
+    const gType = i === 0 ? 'L' : 'S';
+    const ai = a.castAll.indexOf(c.id);
+    let cls = '';
+    if (ai >= 0) { const aType = ai === 0 ? 'L' : ai < 5 ? 'S' : 'M'; cls = aType === gType ? 'g' : 'y'; }
+    if (cls === 'g') anyG = true; if (cls === 'y') anyY = true;
+    const pic = c.pic ? `<img src="${IMG}w92${c.pic}" loading="lazy" alt="">` : `<div class="noimg">${esc(initials(c.name))}</div>`;
+    return `<div class="actor ${cls}" title="${esc(c.name)}${i === 0 ? ' (lead)' : ''}">${pic}<span>${esc(c.name.split(' ').slice(-1)[0])}</span></div>`;
+  }).join('');
+  T.push({ label: 'Cast', cls: anyG ? 'g' : anyY ? 'y' : 'x', html: `<div class="cast">${castHtml || '—'}</div>`, wide: true, castTile: true });
+  if (g.id === a.id) T.forEach(t => t.cls = 'g');
+  return T;
+}
+const EMO = { g: '🟩', y: '🟨', x: '⬛' };
+
+// ---------- game ----------
+let game = null, answer = null, emojiRows = [];
+
+function addRow(g, animate) {
+  const tiles = compare(g, answer);
+  emojiRows.push(tiles.map(t => EMO[t.cls]).join(''));
+  const row = el('div', 'row');
+  row.innerHTML = `<div class="rowhead">${g.poster ? `<img src="${IMG}w92${g.poster}" alt="">` : ''}<span>${esc(g.title)} <small>(${g.year || '?'})</small></span></div>`;
+  const grid = el('div', 'tiles');
+  tiles.forEach((t, i) => {
+    const d = el('div', `tile ${t.cls}${t.wide ? ' wide' : ''}${t.small ? ' small' : ''}${t.castTile ? ' castTile' : ''}${animate ? '' : ' noanim'}`);
+    d.innerHTML = `<div class="lbl">${t.label}</div><div class="val">${t.html}</div>`;
+    if (animate) d.style.animationDelay = (i * 0.18) + 's';
+    grid.appendChild(d);
+  });
+  row.appendChild(grid);
+  $('#rows').prepend(row);
+}
+
+function save() { LS.set('rc:g:' + game.key, game); }
+
+async function startDaily(key) {
+  const ids = shuffled(await getPool());
+  const answerId = ids[dayNum(key) % ids.length];
+  const saved = LS.get('rc:g:' + key, null);
+  game = saved && saved.answerId === answerId ? saved : { key, mode: 'daily', answerId, guesses: [], done: false, won: false, hints: [false, false] };
+  setNav('bDaily');
+  await loadGame();
+}
+async function startUnlimited(fresh) {
+  let saved = LS.get('rc:g:unl', null);
+  if (!saved || fresh) {
+    const ids = await getPool();
+    saved = { key: 'unl', mode: 'unlimited', answerId: ids[Math.floor(Math.random() * ids.length)], guesses: [], done: false, won: false, hints: [false, false] };
+  }
+  game = saved; save();
+  setNav('bUnl');
+  await loadGame();
+}
+async function loadGame() {
+  setStatus('Loading…');
+  $('#rows').innerHTML = ''; emojiRows = [];
+  answer = await getMovie(game.answerId);
+  const gs = await Promise.all(game.guesses.map(getMovie));
+  gs.forEach(g => addRow(g, false));
+  setStatus('');
+  renderMeta();
+}
+
+async function guess(id) {
+  if (!game || game.done) return;
+  if (game.guesses.includes(id)) { toast('Already guessed that one'); return; }
+  try {
+    const g = await getMovie(id);
+    game.guesses.push(id);
+    addRow(g, true);
+    if (id === answer.id) { game.done = true; game.won = true; }
+    else if (game.guesses.length >= MAX) game.done = true;
+    save();
+    if (game.done && game.mode === 'daily') recordStat();
+    $('#count').textContent = game.guesses.length;
+    setTimeout(renderMeta, game.done ? 1600 : 0);
+  } catch (e) { setStatus(e.message); }
+}
+
+function renderMeta() {
+  const today = dateKey(new Date());
+  $('#modeLbl').innerHTML = game.mode === 'unlimited' ? '<b>Unlimited</b>' : `<b>${game.key === today ? 'Daily' : 'Rewatch'}</b> · ${niceDate(game.key)}`;
+  $('#count').textContent = game.guesses.length;
+  $('#q').disabled = game.done;
+  $('#q').placeholder = game.done ? 'Game over' : 'Search for a movie…';
+  renderHints(); renderEnd();
+}
+
+function renderHints() {
+  const box = $('#hints'); box.innerHTML = '';
+  if (game.done) return;
+  const n = game.guesses.length;
+  [[5, 'Hint 1'], [8, 'Hint 2']].forEach(([need, name], i) => {
+    const h = el('div', 'hint');
+    if (game.hints[i]) {
+      if (i === 0) h.innerHTML = answer.tagline ? `<div><div class="t">Tagline</div><q>${esc(answer.tagline)}</q></div>` : `<div><div class="t">No tagline — first letter</div><b>${esc(answer.title[0])}…</b></div>`;
+      else h.innerHTML = `${answer.poster ? `<img src="${IMG}w154${answer.poster}" alt="">` : ''}<div><div class="t">Blurred poster + first letter</div><b>${esc(answer.title[0])}…</b></div>`;
+    } else {
+      const b = el('button', n >= need ? 'primary' : '', n >= need ? `Reveal ${name}` : `${name} unlocks after guess ${need}`);
+      b.disabled = n < need;
+      b.onclick = () => { game.hints[i] = true; save(); renderHints(); };
+      h.appendChild(b);
+    }
+    box.appendChild(h);
+  });
+}
+
+function shareText() {
+  const label = game.mode === 'unlimited' ? 'Unlimited' : game.key;
+  return `Reel Clue ${label} ${game.won ? game.guesses.length : 'X'}/${MAX}${game.hints.some(x => x) ? ' (hints)' : ''}\n` + emojiRows.join('\n');
+}
+async function copy(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = el('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Copied!');
+}
+
+function renderEnd() {
+  const box = $('#end');
+  if (!game.done) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}">
+    ${answer.poster ? `<img src="${IMG}w342${answer.poster}" alt="">` : ''}
+    <div><h2>${game.won ? `Got it in ${game.guesses.length}!` : 'Out of guesses'}</h2>
+    <h3>${esc(answer.title)} (${answer.year || '?'})</h3>
+    <p>${esc(answer.overview)}</p>
+    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>
+    ${game.mode === 'unlimited' ? '<button id="nextBtn">Next film →</button>' : ''}
+    <a href="https://www.themoviedb.org/movie/${answer.id}" target="_blank">View on TMDB</a></div></div></div>`;
+  $('#shareBtn').onclick = () => copy(shareText());
+  if ($('#nextBtn')) $('#nextBtn').onclick = () => startUnlimited(true).catch(e => setStatus(e.message));
+}
+
+// ---------- stats ----------
+function recordStat() { const s = LS.get('rc:stats', {}); if (!(game.key in s)) { s[game.key] = game.won ? game.guesses.length : 0; LS.set('rc:stats', s); } }
+function openStats() {
+  const s = LS.get('rc:stats', {}), vals = Object.values(s);
+  const played = vals.length, wins = vals.filter(v => v > 0).length;
+  let streak = 0; const d = new Date();
+  if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1);
+  while (s[dateKey(d)] > 0) { streak++; d.setDate(d.getDate() - 1); }
+  const dist = Array(MAX).fill(0); vals.forEach(v => { if (v > 0) dist[v - 1]++; });
+  const mx = Math.max(1, ...dist);
+  openModal(`<h2>Stats</h2><div class="stats"><div><b>${played}</b>Played</div><div><b>${played ? Math.round(wins / played * 100) : 0}%</b>Win</div><div><b>${streak}</b>Streak</div></div>
+  <div class="help">Guess distribution (daily games)</div>
+  ${dist.map((c, i) => `<div class="dist"><span style="width:16px">${i + 1}</span><span class="b" style="width:${Math.max(6, c / mx * 100)}%">${c}</span></div>`).join('')}`);
+}
+
+// ---------- rewatch ----------
+function openRewatch() {
+  const s = LS.get('rc:stats', {}); let html = '<h2>Rewatch</h2><div class="help">Play any of the last 50 daily films.</div><div class="days">';
+  for (let i = 0; i < 50; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i); const k = dateKey(d);
+    const g = LS.get('rc:g:' + k, null);
+    const st = k in s ? (s[k] > 0 ? `✓ ${s[k]}/10` : '✗') : g && g.guesses.length ? `in progress` : '—';
+    html += `<button data-k="${k}">${i === 0 ? 'Today' : niceDate(k)}<small>${st}</small></button>`;
+  }
+  openModal(html + '</div>');
+  document.querySelectorAll('.days button').forEach(b => b.onclick = () => { closeModal(); startDaily(b.dataset.k).then(() => setNav(b.dataset.k === dateKey(new Date()) ? 'bDaily' : 'bRewatch')).catch(e => setStatus(e.message)); });
+}
+
+// ---------- settings / help ----------
+function openSettings(first) {
+  const regions = ['US', 'CA', 'GB', 'AU', 'NZ', 'IE', 'DE', 'FR'];
+  openModal(`<h2>${first ? 'Welcome to Reel Clue' : 'Settings'}</h2>
+  ${first ? '<p class="help">To play, paste a free TMDB API key. Get one at <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a> (either the "API Key" or the "API Read Access Token" works). It\'s stored only in this browser.</p>' : ''}
+  <label>TMDB API key or read access token</label><input id="sKey" value="${esc(settings.key)}" placeholder="paste key here">
+  <label>Rating region</label><select id="sRegion">${regions.map(r => `<option ${r === settings.region ? 'selected' : ''}>${r}</option>`).join('')}</select>
+  <label>Mystery film pool (most-voted films on TMDB)</label><select id="sPool">${[250, 500, 1000, 2000].map(n => `<option value="${n}" ${n === settings.poolSize ? 'selected' : ''}>Top ${n}${n === 500 ? ' (default)' : ''}</option>`).join('')}</select>
+  <p class="help">Bigger pool = more obscure films. Changing it changes which film each day picks.</p>
+  <div class="btns" style="margin-top:14px"><button class="primary" id="sSave">Save & play</button>${first ? '' : '<button id="sRebuild">Rebuild film pool</button>'}</div>`);
+  $('#sSave').onclick = async () => {
+    settings.key = $('#sKey').value.trim(); settings.region = $('#sRegion').value; settings.poolSize = +$('#sPool').value;
+    if (!settings.key) { toast('Enter a key'); return; }
+    LS.set('rc:settings', settings); closeModal();
+    try { await startDaily(dateKey(new Date())); } catch (e) { setStatus(e.message); }
+  };
+  if ($('#sRebuild')) $('#sRebuild').onclick = async () => { closeModal(); try { await getPool(true); await startDaily(dateKey(new Date())); } catch (e) { setStatus(e.message); } };
+}
+function openHelp() {
+  openModal(`<h2>How to play</h2><div class="help">
+  <p>Guess the mystery movie in <b>10 tries</b>. Each guess flips 8 clue tiles comparing your pick to the answer.</p>
+  <div class="legend"><span style="background:var(--green)">Green = exact</span><span style="background:var(--gold);color:#1a1300">Gold = close</span><span style="background:var(--gray)">Gray = no match</span></div>
+  <ul>
+  <li><b>Genres</b> — gold if any genre overlaps; highlighted chips are shared.</li>
+  <li><b>Year</b> — gold within 5 years. Arrow points toward the answer (↑ = later).</li>
+  <li><b>Box office</b> — worldwide gross; gold within $100M. ↑ = answer earned more.</li>
+  <li><b>Score</b> — TMDB rating out of 100; gold within 5. ↑ = answer scored higher.</li>
+  <li><b>Rating</b> — certification for your region.</li>
+  <li><b>Studio</b> — green if same lead studio, gold if any production company is shared.</li>
+  <li><b>Director</b> — green if any director is shared.</li>
+  <li><b>Cast</b> — lead (big) + 4 supporting. Green ring = same actor in the same role type. Gold ring = actor is in the answer but in a different role type.</li>
+  </ul>
+  <p>Hints unlock after guess 5 (tagline) and guess 8 (blurred poster).</p>
+  <p><b>Daily</b> resets at midnight. <b>Rewatch</b> replays the last 50 days. <b>Unlimited</b> gives random films anytime.</p></div>`);
+}
+function openModal(html) { $('#mbody').innerHTML = html; $('#modal').hidden = false; }
+function closeModal() { $('#modal').hidden = true; }
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal' && settings.key) closeModal(); };
+
+function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
+$('#bDaily').onclick = () => startDaily(dateKey(new Date())).catch(e => setStatus(e.message));
+$('#bUnl').onclick = () => startUnlimited(false).catch(e => setStatus(e.message));
+$('#bRewatch').onclick = openRewatch;
+$('#bStats').onclick = openStats;
+$('#bHelp').onclick = openHelp;
+$('#bSettings').onclick = () => openSettings(false);
+
+// ---------- search ----------
+let sTimer = null, sel = -1, results = [], sToken = 0;
+const q = $('#q'), drop = $('#drop');
+q.addEventListener('input', () => {
+  clearTimeout(sTimer); const v = q.value.trim();
+  if (v.length < 2) { drop.hidden = true; return; }
+  sTimer = setTimeout(() => doSearch(v), 250);
+});
+async function doSearch(v) {
+  const tok = ++sToken;
+  try {
+    const d = await tmdb('/search/movie', { query: v, include_adult: 'false' });
+    if (tok !== sToken) return;
+    results = d.results.filter(m => m.release_date).sort((a, b) => b.vote_count - a.vote_count).slice(0, 8);
+    sel = results.length ? 0 : -1; renderDrop();
+  } catch (e) { setStatus(e.message); }
+}
+function renderDrop() {
+  if (!results.length) { drop.innerHTML = '<div class="opt"><small>No matches</small></div>'; drop.hidden = false; return; }
+  drop.innerHTML = results.map((m, i) => `<div class="opt ${i === sel ? 'sel' : ''}" data-i="${i}">
+    ${m.poster_path ? `<img src="${IMG}w92${m.poster_path}" alt="">` : '<div class="ph"></div>'}
+    <div>${esc(m.title)} <small>(${m.release_date.slice(0, 4)})</small>${game && game.guesses.includes(m.id) ? ' <small>· guessed</small>' : ''}</div></div>`).join('');
+  drop.hidden = false;
+  drop.querySelectorAll('.opt[data-i]').forEach(o => o.onmousedown = e => { e.preventDefault(); pick(+o.dataset.i); });
+}
+function pick(i) { const m = results[i]; if (!m) return; q.value = ''; drop.hidden = true; results = []; guess(m.id); }
+q.addEventListener('keydown', e => {
+  if (drop.hidden || !results.length) return;
+  if (e.key === 'ArrowDown') { sel = (sel + 1) % results.length; renderDrop(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { sel = (sel - 1 + results.length) % results.length; renderDrop(); e.preventDefault(); }
+  else if (e.key === 'Enter') { pick(sel); e.preventDefault(); }
+  else if (e.key === 'Escape') drop.hidden = true;
+});
+q.addEventListener('blur', () => setTimeout(() => drop.hidden = true, 150));
+
+// ---------- init ----------
+(async function init() {
+  if (!settings.key) { openSettings(true); return; }
+  try { await startDaily(dateKey(new Date())); }
+  catch (e) { setStatus(e.message + ' — check your key in ⚙ settings.'); }
+})();
+</script>
+</body>
+</html>
