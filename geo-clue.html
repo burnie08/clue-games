@@ -216,6 +216,18 @@ function hideMsg() { $('#msg').classList.remove('on'); }
 
 // ---------- settings & usage ----------
 let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000 }, LS.get('gc:settings', {}));
+// Optional: a key stored in Vercel (Settings → Environment Variables → GOOGLE_MAPS_KEY) is served by /api/config,
+// so every device works without pasting the key. A key typed into ⚙ Settings takes priority.
+let serverKey = '';
+function saveSettings() { const s = Object.assign({}, settings); if (serverKey && s.key === serverKey) s.key = ''; LS.set('gc:settings', s); }
+async function loadServerKey() {
+  try {
+    const r = await fetch('api/config', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.googleMapsKey) { serverKey = j.googleMapsKey; if (!settings.key) settings.key = serverKey; }
+  } catch (e) { /* no server config (e.g. GitHub Pages) — fine */ }
+}
 function usage() { const u = LS.get('gc:usage', null); return u && u.month === monthKey() ? u : { month: monthKey(), panos: 0, maps: 0 }; }
 function bump(kind) { const u = usage(); u[kind]++; LS.set('gc:usage', u); }
 function overCap() { return usage().panos >= settings.cap; }
@@ -457,7 +469,8 @@ function openSettings(first) {
   const u = usage();
   openModal(`<h2>${first ? 'Set up Geo Clue' : 'Settings'}</h2>
   ${first ? setupSteps() : ''}
-  <label>Google Maps API key</label><input id="sKey" value="${esc(settings.key)}" placeholder="AIza…">
+  <label>Google Maps API key</label><input id="sKey" value="${esc(settings.key === serverKey ? '' : settings.key)}" placeholder="${serverKey ? 'Using the key from your Vercel settings ✓' : 'AIza…'}" autocomplete="off">
+  <p class="help" style="margin:4px 0 0">Saves as soon as you paste it.</p>
   <div class="grid2">
     <div><label>Unlimited: map</label><select id="sPack">${Object.entries(PACKS).map(([k, p]) => `<option value="${k}" ${k === settings.pack ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
     <div><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
@@ -470,12 +483,15 @@ function openSettings(first) {
     <div class="bar"><div style="width:${Math.min(100, u.panos / settings.cap * 100)}%"></div></div>
     <span class="help">Only counts this browser. Your real total is in Google Cloud Console → Google Maps Platform → Metrics.</span></div>
   <div class="btns" style="margin-top:14px;justify-content:flex-start"><button class="primary" id="sSave">Save</button></div>`);
+  const keyAtOpen = settings.key;
+  const readKey = () => $('#sKey').value.trim() || serverKey;
+  $('#sKey').oninput = () => { settings.key = readKey(); saveSettings(); };
   $('#sSave').onclick = () => {
-    const newKey = $('#sKey').value.trim();
+    const newKey = readKey();
     if (!newKey) { toast('Enter an API key'); return; }
-    const keyChanged = newKey !== settings.key;
+    const keyChanged = newKey !== keyAtOpen;
     Object.assign(settings, { key: newKey, pack: $('#sPack').value, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
-    LS.set('gc:settings', settings); closeModal();
+    saveSettings(); closeModal();
     if (keyChanged && G) { location.reload(); return; }
     if (first) startDaily();
     else if (homeOn()) renderHome();
@@ -489,7 +505,7 @@ function setupSteps() {
   <li>Enable the <b>Maps JavaScript API</b>.</li>
   <li>Under <b>Keys &amp; Credentials</b>, create an API key. Restrict it:<br>• Application restriction: <b>Websites</b> → add your site, e.g. <code>https://your-site.vercel.app/*</code><br>• API restriction: <b>Maps JavaScript API</b> only</li>
   <li>Optional but recommended: set a <b>budget alert</b> (Billing → Budgets &amp; alerts) at $1, and lower the API's daily quota.</li>
-  <li>Paste the key below. It's saved only in this browser.</li></ol></div>`;
+  <li>Paste the key below. It's saved in this browser only.<br><b>To make it work on every device automatically:</b> in Vercel open your project → Settings → Environment Variables, add <code>GOOGLE_MAPS_KEY</code> with the key as its value, then redeploy.</li></ol></div>`;
 }
 function openHelp() {
   openModal(`<h2>How to play</h2><div class="help">
@@ -500,7 +516,7 @@ function openHelp() {
   <p>Hover the mini-map to make it bigger (tap 🗺 on phones). Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
 }
 function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
-function closeModal() { $('#modal').hidden = true; }
+function closeModal() { $('#modal').hidden = true; if (homeOn()) renderHome(); }
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
@@ -543,7 +559,7 @@ function renderHome() {
 }
 ['#hPack', '#hMove', '#hTimer'].forEach(id => $(id).onchange = () => {
   Object.assign(settings, { pack: $('#hPack').value, move: $('#hMove').value, timer: +$('#hTimer').value });
-  LS.set('gc:settings', settings); renderHome();
+  saveSettings(); renderHome();
 });
 const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
 $('#hDaily').onclick = needKey(() => startDaily());
@@ -554,6 +570,7 @@ $('#hSet').onclick = () => openSettings(!settings.key);
 
 // ---------- init ----------
 showHome();
+loadServerKey().then(() => { if (homeOn()) renderHome(); });
 </script>
 </body>
 </html>
