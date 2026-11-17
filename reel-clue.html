@@ -482,7 +482,7 @@ function renderDrop() {
   if (!results.length) { drop.innerHTML = '<div class="opt"><small>No matches</small></div>'; drop.hidden = false; return; }
   drop.innerHTML = results.map((m, i) => `<div class="opt ${i === sel ? 'sel' : ''}" data-i="${i}">
     ${m.poster_path ? `<img src="${IMG}w92${m.poster_path}" alt="">` : '<div class="ph"></div>'}
-    <div>${esc(m.title)} <small>(${m.release_date.slice(0, 4)})</small>${game && game.guesses.includes(m.id) ? ' <small>· guessed</small>' : ''}</div></div>`).join('');
+    <div>${esc(m.title)}${game && game.guesses.includes(m.id) ? ' <small>· guessed</small>' : ''}</div></div>`).join('');
   drop.hidden = false;
   drop.querySelectorAll('.opt[data-i]').forEach(o => o.onmousedown = e => { e.preventDefault(); pick(+o.dataset.i); });
 }
