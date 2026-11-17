@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geo Clue</title>
+<style>
+:root{--bg:#0f1117;--panel:#181b24;--panel2:#20242f;--text:#e9ecf2;--muted:#8b93a7;--green:#3a9d4f;--gold:#c79a22;--red:#b8423f;--accent:#e4b343}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+body{display:flex;flex-direction:column}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:10px 14px;background:var(--panel2);color:var(--text)}
+button:hover:not(:disabled){filter:brightness(1.25)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:#1a1300;font-weight:700}
+input,select{font:inherit;background:var(--panel2);color:var(--text);border:1px solid #2f3442;border-radius:8px;padding:10px 12px;width:100%}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid #232733;flex-wrap:wrap;flex:none}
+.logo{font-weight:800;font-size:22px;letter-spacing:.5px}.logo span{color:var(--accent)}
+nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
+nav button.on{background:var(--accent);color:#1a1300}
+#game{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+#pano{position:absolute;inset:0}
+#block{position:absolute;inset:0;z-index:5;display:none}
+#block.on{display:block}
+#hud{position:absolute;top:10px;left:10px;z-index:6;display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:#000b;border-radius:8px;padding:6px 10px;font-weight:600;font-size:14px}
+.chip small{color:var(--muted);font-weight:400}
+#timer.low{color:#ff6b6b}
+#tools{position:absolute;top:10px;right:10px;z-index:6;display:flex;gap:6px}
+#tools button{background:#000b;padding:8px 10px}
+#mapBox{position:absolute;right:12px;bottom:24px;width:320px;height:240px;z-index:7;display:flex;flex-direction:column;gap:6px;transition:width .15s,height .15s;opacity:.85}
+#mapBox:hover,#mapBox.pinned{width:min(620px,60vw);height:min(440px,60vh);opacity:1}
+#map{flex:1;border-radius:10px;overflow:hidden;border:2px solid #000}
+#guessBtn{width:100%}
+#mapToggle{display:none;position:absolute;right:12px;bottom:24px;z-index:7}
+#mapBox.result{left:0;right:0;top:0;bottom:0;width:auto;height:auto;opacity:1;transition:none}
+#mapBox.result #map{border:0;border-radius:0}
+#mapBox.result #guessBtn{display:none}
+#resPanel{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:8;background:var(--panel);border-radius:14px;padding:16px 20px;min-width:300px;max-width:92vw;text-align:center;box-shadow:0 10px 40px #000a;display:none}
+#resPanel.on{display:block}
+#resPanel h2{margin:0 0 4px;font-size:26px}
+#resPanel .dist{color:var(--muted);margin-bottom:6px}
+#resPanel .where{color:var(--muted);font-size:13px;margin-bottom:10px}
+.bar{height:10px;background:#0b0d12;border-radius:5px;overflow:hidden;margin:8px 0 12px}
+.bar div{height:100%;background:var(--accent)}
+.rounds{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:14px;margin:8px 0 12px}
+.rounds div{display:flex;justify-content:space-between;gap:20px}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+#msg{position:absolute;inset:0;z-index:9;display:none;align-items:center;justify-content:center;text-align:center;padding:20px;background:var(--bg)}
+#msg.on{display:flex}
+#msg .inner{max-width:480px;color:var(--muted);line-height:1.5}
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal[hidden]{display:none}
+.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:90vh;overflow:auto;position:relative}
+.mbox h2{margin-top:0}.mbox .close{position:absolute;right:10px;top:10px;background:none;font-size:22px}
+.mbox label{display:block;margin:12px 0 4px;color:var(--muted);font-size:13px}
+.help{color:var(--muted);font-size:13px;line-height:1.55}
+.help ol{padding-left:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stats{display:flex;gap:10px;text-align:center;margin-bottom:16px}
+.stats div{flex:1;background:var(--panel2);border-radius:10px;padding:10px}.stats b{display:block;font-size:22px}
+.usage{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+.usage .bar{margin:6px 0 2px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#toast.show{opacity:1}
+@media (max-width:700px){
+  #mapBox{display:none;left:0;right:0;bottom:0;width:auto;height:65%;padding:8px;background:var(--bg);opacity:1}
+  #mapBox:hover{width:auto;height:65%}
+  #mapBox.open{display:flex}
+  #mapBox.result{display:flex;height:auto;padding:0}
+  #mapToggle{display:block}
+  #resPanel{bottom:10px;min-width:0;width:92vw}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Geo<span>Clue</span></div>
+  <nav>
+    <button id="bDaily" class="on">Daily</button>
+    <button id="bUnl">Unlimited</button>
+    <button id="bStats">Stats</button>
+    <button id="bHelp">?</button>
+    <button id="bSettings">⚙</button>
+  </nav>
+</header>
+<div id="game">
+  <div id="pano"></div>
+  <div id="block"></div>
+  <div id="hud">
+    <div class="chip" id="hRound"></div>
+    <div class="chip" id="hScore"></div>
+    <div class="chip" id="hMode"></div>
+    <div class="chip" id="timer" hidden></div>
+  </div>
+  <div id="tools"><button id="backBtn" title="Return to start">⟲ Start</button></div>
+  <button id="mapToggle" class="primary">🗺 Map</button>
+  <div id="mapBox">
+    <div id="map"></div>
+    <button id="guessBtn" class="primary" disabled>Place a pin on the map</button>
+  </div>
+  <div id="resPanel"></div>
+  <div id="msg"><div class="inner" id="msgInner">Loading…</div></div>
+</div>
+<div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// MAP PACKS — regions with Street View coverage.
+// Each region: [name, latMin, latMax, lngMin, lngMax, weight]
+// A random point is picked inside a region, then the nearest
+// official Google Street View within 50 km is used.
+// ============================================================
+const R_USA = [['USA West', 32.5, 48.5, -124, -104, 3], ['USA Central', 29, 48.5, -104, -90, 3], ['USA East', 25.5, 47, -90, -70, 3], ['Hawaii', 19, 22.2, -160, -154.8, 0.2]];
+const R_AMERICAS_OTHER = [['Canada', 43, 54, -123, -64, 3], ['Mexico', 16, 30, -110, -88, 2], ['Guatemala', 14, 16, -91.5, -89, 0.4], ['Puerto Rico', 18, 18.5, -67.2, -65.6, 0.2],
+  ['Colombia', 1, 11, -77, -72, 1], ['Ecuador', -4, 1, -80.5, -77.5, 0.5], ['Peru', -17, -4, -81, -70, 1], ['Bolivia', -21, -16, -68.5, -63, 0.4], ['Brazil', -30, -3, -55, -35, 3],
+  ['Uruguay', -34.8, -30.5, -58, -53.5, 0.5], ['Argentina', -45, -22, -70, -57, 2], ['Chile', -42, -18, -73, -69.5, 1]];
+const R_EUROPE = [['UK', 50.5, 57.5, -5, 1.5, 2], ['Ireland', 51.5, 55, -10, -6, 0.7], ['France', 43.5, 50.5, -1.5, 7, 2.5], ['Spain', 36.5, 43.5, -8.5, 3, 2], ['Portugal', 37, 42, -8.8, -7, 0.7],
+  ['Italy', 38, 46, 8, 16.5, 2], ['Germany', 48, 54.5, 6.5, 14.5, 2], ['Netherlands', 51.5, 53.3, 4, 7, 0.6], ['Belgium', 50, 51.3, 3, 6, 0.4], ['Switzerland', 46, 47.6, 6.2, 10, 0.5],
+  ['Austria', 46.5, 48.7, 9.6, 16.8, 0.6], ['Poland', 49.5, 54.5, 14.5, 23.5, 1.5], ['Czechia', 48.7, 50.9, 12.5, 18.5, 0.6], ['Hungary', 46, 48.4, 16.5, 22.5, 0.6], ['Romania', 44, 48, 21, 28, 1.2],
+  ['Bulgaria', 41.5, 44, 22.5, 28, 0.6], ['Greece', 37, 41.5, 20.5, 26, 0.8], ['Croatia', 43, 46, 14, 19, 0.5], ['Slovenia', 45.5, 46.8, 13.5, 16.4, 0.3], ['Serbia', 42.5, 46, 19, 22.8, 0.5],
+  ['Norway', 58, 64, 5, 12, 1], ['Sweden', 55.5, 64, 12, 19, 1.2], ['Finland', 60, 66, 21.5, 30, 1], ['Denmark', 54.8, 57.6, 8.2, 12.6, 0.5], ['Estonia', 57.6, 59.6, 22, 28, 0.3],
+  ['Latvia', 56, 57.9, 21, 28, 0.3], ['Lithuania', 54, 56.4, 21, 26.5, 0.3], ['Iceland', 63.5, 66.3, -23, -13.5, 0.4], ['Turkey', 36.5, 41.5, 27, 44, 1.5], ['Russia', 52, 60, 30, 60, 2]];
+const R_ASIA = [['Japan', 33, 43.5, 130.5, 145, 2], ['South Korea', 34.5, 38, 126.5, 129.5, 0.8], ['Taiwan', 22, 25.2, 120, 121.9, 0.5], ['Thailand', 7, 20, 98, 104.5, 1.5],
+  ['Malaysia', 1.5, 6.5, 100, 104, 0.7], ['Indonesia', -8.8, -6, 105, 116, 1.2], ['Philippines', 6, 18.5, 120, 126, 1], ['India', 8, 30, 72, 88, 2], ['Sri Lanka', 6, 9.8, 79.8, 81.8, 0.3],
+  ['Bangladesh', 21, 25.5, 88.5, 92.5, 0.4], ['Cambodia', 10.5, 14.5, 102.5, 107.5, 0.4], ['Mongolia', 43, 50, 90, 118, 0.3], ['Kyrgyzstan', 40, 43, 70, 80, 0.3], ['Israel', 29.5, 33.2, 34.3, 35.8, 0.4],
+  ['Jordan', 29.5, 32.5, 35, 38, 0.3], ['UAE', 23, 26, 51.5, 56.3, 0.3], ['Singapore', 1.25, 1.45, 103.65, 104, 0.15], ['Hong Kong', 22.2, 22.5, 113.85, 114.35, 0.15]];
+const R_AFRICA = [['South Africa', -34.5, -23, 18, 32, 1.5], ['Kenya', -4.5, 1, 34, 41, 0.5], ['Nigeria', 5, 13, 3, 14, 0.5], ['Ghana', 5, 11, -3, 1, 0.4], ['Senegal', 12.5, 16.5, -17.5, -11.5, 0.3],
+  ['Botswana', -26, -18, 20, 29, 0.3], ['Uganda', -1.5, 4, 29.5, 35, 0.3], ['Tunisia', 33, 37.3, 8, 11, 0.3]];
+const R_OCEANIA = [['Australia (East)', -38.5, -17, 140, 153.5, 2], ['Australia (West)', -35, -30, 115, 121, 0.5], ['New Zealand', -46.5, -34.5, 166.5, 178.5, 0.8]];
+
+const PACKS = {
+  world:    { name: 'World',    size: 14917, center: { lat: 20, lng: 0 },   zoom: 1, regions: [...R_USA, ...R_AMERICAS_OTHER, ...R_EUROPE, ...R_ASIA, ...R_AFRICA, ...R_OCEANIA] },
+  usa:      { name: 'USA',      size: 5000,  center: { lat: 39, lng: -97 }, zoom: 3, regions: R_USA.filter(r => r[0] !== 'Hawaii') },
+  americas: { name: 'Americas', size: 12000, center: { lat: 5, lng: -80 },  zoom: 2, regions: [...R_USA, ...R_AMERICAS_OTHER] },
+  europe:   { name: 'Europe',   size: 4500,  center: { lat: 52, lng: 15 },  zoom: 3, regions: R_EUROPE },
+  asia:     { name: 'Asia',     size: 9000,  center: { lat: 25, lng: 100 }, zoom: 2, regions: R_ASIA },
+  oceania:  { name: 'Australia & NZ', size: 5000, center: { lat: -30, lng: 150 }, zoom: 3, regions: R_OCEANIA }
+};
+const MOVES = { move: 'Moving', nomove: 'No move', nmpz: 'NMPZ' };
+const ROUNDS = 5;
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const pad = n => String(n).padStart(2, '0');
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function monthKey() { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+function niceDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1800); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function distKm(a, b) {
+  const r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function scoreFor(km, size) { return Math.round(5000 * Math.exp(-10 * km / size)); }
+function fmtDist(km) {
+  if (settings.units === 'mi') { const mi = km * 0.621371; return mi < 0.2 ? Math.round(mi * 5280) + ' ft' : mi < 100 ? mi.toFixed(1) + ' mi' : Math.round(mi).toLocaleString() + ' mi'; }
+  return km < 1 ? Math.round(km * 1000) + ' m' : km < 100 ? km.toFixed(1) + ' km' : Math.round(km).toLocaleString() + ' km';
+}
+function showMsg(html) { $('#msgInner').innerHTML = html; $('#msg').classList.add('on'); }
+function hideMsg() { $('#msg').classList.remove('on'); }
+
+// ---------- settings & usage ----------
+let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000 }, LS.get('gc:settings', {}));
+function usage() { const u = LS.get('gc:usage', null); return u && u.month === monthKey() ? u : { month: monthKey(), panos: 0, maps: 0 }; }
+function bump(kind) { const u = usage(); u[kind]++; LS.set('gc:usage', u); }
+function overCap() { return usage().panos >= settings.cap; }
+
+// ---------- Google Maps loading ----------
+let G = null, map = null, pano = null, sv = null, guessMarker = null, resultLayers = [];
+function loadGoogle() {
+  if (G) return Promise.resolve();
+  return new Promise((res, rej) => {
+    window.gm_authFailure = () => showMsg('Google rejected the API key.<br><br>Check that the <b>Maps JavaScript API</b> is enabled, billing is set up, and the key allows this website. Then fix the key in ⚙ Settings.');
+    window.__gcReady = async () => {
+      try {
+        const libs = await Promise.all(['core', 'maps', 'streetView', 'marker'].map(l => google.maps.importLibrary(l)));
+        G = Object.assign({}, ...libs);
+        res();
+      } catch (e) { rej(e); }
+    };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(settings.key)}&v=weekly&loading=async&callback=__gcReady`;
+    s.async = true;
+    s.onerror = () => rej(new Error('Could not load Google Maps. Check your connection.'));
+    document.head.appendChild(s);
+  });
+}
+function initMap() {
+  if (map) return;
+  map = new G.Map($('#map'), { center: { lat: 20, lng: 0 }, zoom: 1, disableDefaultUI: true, zoomControl: true, clickableIcons: false, draggableCursor: 'crosshair', gestureHandling: 'greedy' });
+  bump('maps');
+  sv = new G.StreetViewService();
+  map.addListener('click', e => {
+    if (!game || game.phase !== 'play') return;
+    const p = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+    if (!guessMarker) guessMarker = new G.Marker({ map, position: p });
+    else { guessMarker.setPosition(p); guessMarker.setMap(map); }
+    $('#guessBtn').disabled = false; $('#guessBtn').textContent = 'Guess';
+  });
+}
+
+// ---------- finding locations (metadata lookups are free) ----------
+function weightedPick(list, rng) { const tot = list.reduce((a, r) => a + r[5], 0); let x = rng() * tot; for (const r of list) { x -= r[5]; if (x <= 0) return r; } return list[list.length - 1]; }
+async function findLocation(rng, pack) {
+  for (let i = 0; i < 30; i++) {
+    const r = weightedPick(PACKS[pack].regions, rng);
+    const location = { lat: r[1] + rng() * (r[2] - r[1]), lng: r[3] + rng() * (r[4] - r[3]) };
+    const req = { location, radius: 50000, preference: 'nearest' };
+    if (G.StreetViewSource && G.StreetViewSource.GOOGLE) req.sources = [G.StreetViewSource.GOOGLE]; else req.source = 'outdoor';
+    try {
+      const { data } = await sv.getPanorama(req);
+      if (data && data.location && data.location.pano) {
+        return { pano: data.location.pano, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(), desc: data.location.description || '', region: r[0], heading: Math.round(rng() * 360), guess: null, km: null, pts: null };
+      }
+    } catch (e) { /* no coverage near this point — try another */ }
+  }
+  throw new Error('Could not find Street View coverage. Try again.');
+}
+
+// ---------- game ----------
+let game = null, timerId = null;
+const P = () => PACKS[game.pack];
+function save() { LS.set(game.mode === 'daily' ? 'gc:g:' + game.key : 'gc:g:unl', game); }
+
+async function boot() {
+  if (!settings.key) { showMsg('Add your Google Maps API key in ⚙ Settings to play.'); openSettings(true); return false; }
+  if (G) return true;
+  showMsg('Loading Google Maps…');
+  try { await loadGoogle(); initMap(); return true; }
+  catch (e) { showMsg(esc(e.message)); return false; }
+}
+async function startDaily() {
+  if (!(await boot())) return;
+  const key = dateKey(new Date());
+  setNav('bDaily');
+  const saved = LS.get('gc:g:' + key, null);
+  if (saved) { game = saved; return resume(); }
+  showMsg('Finding today\'s 5 locations…');
+  const rng = mulberry32(hash('geoclue-' + key));
+  const rounds = [];
+  try { for (let i = 0; i < ROUNDS; i++) rounds.push(await findLocation(rng, 'world')); }
+  catch (e) { showMsg(esc(e.message)); return; }
+  game = { mode: 'daily', key, pack: 'world', move: 'move', timer: 0, rounds, idx: 0, phase: 'play' };
+  save(); resume();
+}
+async function startUnlimited(fresh) {
+  if (!(await boot())) return;
+  setNav('bUnl');
+  const saved = LS.get('gc:g:unl', null);
+  if (saved && !fresh && saved.phase !== 'final') { game = saved; return resume(); }
+  showMsg(`Finding 5 locations in ${esc(PACKS[settings.pack].name)}…`);
+  const rng = mulberry32((Math.random() * 2 ** 32) >>> 0);
+  const rounds = [];
+  try { for (let i = 0; i < ROUNDS; i++) rounds.push(await findLocation(rng, settings.pack)); }
+  catch (e) { showMsg(esc(e.message)); return; }
+  game = { mode: 'unl', key: 'unl', pack: settings.pack, move: settings.move, timer: +settings.timer, rounds, idx: 0, phase: 'play' };
+  save(); resume();
+}
+function resume() {
+  hideMsg();
+  if (game.phase === 'play') showRound();
+  else if (game.phase === 'result') showResult();
+  else showFinal();
+}
+function total() { return game.rounds.reduce((a, r) => a + (r.pts || 0), 0); }
+function hud() {
+  $('#hRound').innerHTML = `Round <b>${Math.min(game.idx + 1, ROUNDS)}</b><small>/${ROUNDS}</small>`;
+  $('#hScore').innerHTML = `${total().toLocaleString()} <small>pts</small>`;
+  $('#hMode').innerHTML = game.mode === 'daily' ? `Daily · ${niceDate(game.key)}` : `${esc(P().name)} · ${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+}
+function clearResultLayers() { resultLayers.forEach(l => l.setMap(null)); resultLayers = []; }
+
+function showRound() {
+  if (overCap()) { showMsg(`You've used <b>${usage().panos.toLocaleString()}</b> Street View loads this month, which hits your limit of ${settings.cap.toLocaleString()}.<br><br>Google gives 5,000 free per month. You can raise the limit in ⚙ Settings, or wait for next month.`); return; }
+  const r = game.rounds[game.idx];
+  hud(); clearResultLayers();
+  $('#resPanel').classList.remove('on');
+  $('#mapBox').classList.remove('result', 'open', 'pinned');
+  if (guessMarker) guessMarker.setMap(null);
+  $('#guessBtn').disabled = true; $('#guessBtn').textContent = 'Place a pin on the map';
+  map.setCenter(P().center); map.setZoom(P().zoom);
+  const nm = game.move !== 'move', nmpz = game.move === 'nmpz';
+  const opts = { pano: r.pano, pov: { heading: r.heading, pitch: 0 }, zoom: 0, visible: true,
+    addressControl: false, showRoadLabels: false, fullscreenControl: false, motionTracking: false, motionTrackingControl: false, enableCloseButton: false,
+    linksControl: !nm, clickToGo: !nm, scrollwheel: !nmpz, zoomControl: !nmpz, panControl: true };
+  if (!pano) {
+    pano = new G.StreetViewPanorama($('#pano'), opts);
+    pano.addListener('pano_changed', () => { if (game && game.phase === 'play' && game.move !== 'move' && pano.getPano() !== game.rounds[game.idx].pano) pano.setPano(game.rounds[game.idx].pano); });
+  } else { pano.setOptions(opts); }
+  bump('panos');
+  $('#block').classList.toggle('on', nmpz);
+  $('#backBtn').hidden = nmpz;
+  startTimer();
+}
+function startTimer() {
+  clearInterval(timerId);
+  const t = $('#timer');
+  if (!game.timer) { t.hidden = true; return; }
+  let left = game.timer; t.hidden = false;
+  const draw = () => { t.textContent = `⏱ ${left}s`; t.classList.toggle('low', left <= 10); };
+  draw();
+  timerId = setInterval(() => { left--; draw(); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
+}
+function makeGuess(timedOut) {
+  if (!game || game.phase !== 'play') return;
+  clearInterval(timerId);
+  const r = game.rounds[game.idx];
+  if (guessMarker && guessMarker.getMap()) {
+    const p = guessMarker.getPosition(); r.guess = { lat: p.lat(), lng: p.lng() };
+    r.km = distKm(r.guess, r); r.pts = scoreFor(r.km, P().size);
+  } else { r.guess = null; r.km = null; r.pts = 0; if (timedOut) toast('Time\'s up!'); }
+  game.phase = 'result'; save(); showResult();
+}
+function drawRoundOnMap(r, i, bounds) {
+  const actual = new G.Marker({ map, position: { lat: r.lat, lng: r.lng }, label: { text: String(i + 1), color: '#fff', fontWeight: '700' },
+    icon: { path: G.SymbolPath.CIRCLE, scale: 11, fillColor: '#3a9d4f', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+  resultLayers.push(actual); bounds.extend(actual.getPosition());
+  if (r.guess) {
+    const g = new G.Marker({ map, position: r.guess, icon: { path: G.SymbolPath.CIRCLE, scale: 7, fillColor: '#e4b343', fillOpacity: 1, strokeColor: '#000', strokeWeight: 1.5 } });
+    const line = new G.Polyline({ map, path: [r.guess, { lat: r.lat, lng: r.lng }], geodesic: true, strokeOpacity: 0,
+      icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#e9ecf2', scale: 3 }, offset: '0', repeat: '14px' }] });
+    resultLayers.push(g, line); bounds.extend(g.getPosition());
+  }
+}
+function mapsLink(r) { return `https://www.google.com/maps/@?api=1&map_action=pano&pano=${encodeURIComponent(r.pano)}`; }
+function showResult() {
+  const r = game.rounds[game.idx];
+  hud(); clearInterval(timerId); $('#timer').hidden = true;
+  if (guessMarker) guessMarker.setMap(null);
+  $('#block').classList.remove('on');
+  $('#mapBox').classList.add('result'); $('#mapBox').classList.remove('open');
+  clearResultLayers();
+  const b = new G.LatLngBounds(); drawRoundOnMap(r, game.idx, b);
+  if (r.guess) map.fitBounds(b, 80); else { map.setCenter({ lat: r.lat, lng: r.lng }); map.setZoom(5); }
+  const last = game.idx >= ROUNDS - 1;
+  $('#resPanel').innerHTML = `<h2>${(r.pts || 0).toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 5,000</span></h2>
+    <div class="bar"><div style="width:${(r.pts || 0) / 50}%"></div></div>
+    <div class="dist">${r.guess ? `Your guess was <b>${fmtDist(r.km)}</b> away` : 'No guess placed'}</div>
+    <div class="where">📍 ${esc(r.desc || r.region)} · <a href="${mapsLink(r)}" target="_blank">open in Google Maps</a></div>
+    <div class="btns"><button class="primary" id="nextBtn">${last ? 'See final score' : 'Next round →'}</button></div>`;
+  $('#resPanel').classList.add('on');
+  $('#nextBtn').onclick = () => {
+    if (game.phase !== 'result') return;
+    if (last) { game.phase = 'final'; if (game.mode === 'daily') recordStat(); save(); showFinal(); }
+    else { game.idx++; game.phase = 'play'; save(); showRound(); }
+  };
+}
+function showFinal() {
+  game.idx = ROUNDS - 1; hud(); clearInterval(timerId); $('#timer').hidden = true;
+  if (guessMarker) guessMarker.setMap(null);
+  $('#block').classList.remove('on');
+  $('#mapBox').classList.add('result');
+  clearResultLayers();
+  const b = new G.LatLngBounds(); game.rounds.forEach((r, i) => drawRoundOnMap(r, i, b)); map.fitBounds(b, 60);
+  const t = total();
+  $('#resPanel').innerHTML = `<h2>${t.toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 25,000</span></h2>
+    <div class="bar"><div style="width:${t / 250}%"></div></div>
+    <div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(r.region)}</a></span><span>${r.guess ? fmtDist(r.km) : '—'} · <b>${(r.pts || 0).toLocaleString()}</b></span></div>`).join('')}</div>
+    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>${game.mode === 'daily' ? '<button id="playUnl">Play Unlimited →</button>' : '<button id="againBtn">New game →</button>'}</div>`;
+  $('#resPanel').classList.add('on');
+  $('#shareBtn').onclick = () => copy(shareText());
+  if ($('#againBtn')) $('#againBtn').onclick = () => startUnlimited(true);
+  if ($('#playUnl')) $('#playUnl').onclick = () => startUnlimited(false);
+}
+function shareText() {
+  const sq = p => p >= 4000 ? '🟩' : p >= 2000 ? '🟨' : p >= 500 ? '🟧' : '🟥';
+  const label = game.mode === 'daily' ? game.key : `${P().name} · ${MOVES[game.move]}`;
+  return `Geo Clue ${label}\n${total().toLocaleString()} / 25,000\n${game.rounds.map(r => sq(r.pts || 0)).join('')}`;
+}
+async function copy(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Copied!');
+}
+
+// ---------- buttons ----------
+$('#guessBtn').onclick = () => makeGuess(false);
+$('#mapToggle').onclick = () => $('#mapBox').classList.toggle('open');
+$('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(0); } };
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if ((e.key === ' ' || e.key === 'Enter') && game) {
+    if (game.phase === 'play' && !$('#guessBtn').disabled) { e.preventDefault(); makeGuess(false); }
+    else if (game.phase === 'result' && $('#nextBtn')) { e.preventDefault(); $('#nextBtn').click(); }
+  }
+});
+
+// ---------- stats ----------
+function recordStat() { const s = LS.get('gc:stats', {}); if (!(game.key in s)) { s[game.key] = total(); LS.set('gc:stats', s); } }
+function openStats() {
+  const s = LS.get('gc:stats', {}), keys = Object.keys(s).sort().reverse(), v = keys.map(k => s[k]);
+  const avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  openModal(`<h2>Stats</h2><div class="stats"><div><b>${v.length}</b>Dailies</div><div><b>${avg.toLocaleString()}</b>Average</div><div><b>${(v.length ? Math.max(...v) : 0).toLocaleString()}</b>Best</div></div>
+  <div class="help">${keys.slice(0, 14).map(k => `${niceDate(k)} — <b>${s[k].toLocaleString()}</b>`).join('<br>') || 'No daily games yet.'}</div>`);
+}
+
+// ---------- settings / help ----------
+function openSettings(first) {
+  const u = usage();
+  openModal(`<h2>${first ? 'Set up Geo Clue' : 'Settings'}</h2>
+  ${first ? setupSteps() : ''}
+  <label>Google Maps API key</label><input id="sKey" value="${esc(settings.key)}" placeholder="AIza…">
+  <div class="grid2">
+    <div><label>Unlimited: map</label><select id="sPack">${Object.entries(PACKS).map(([k, p]) => `<option value="${k}" ${k === settings.pack ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
+    <div><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div><label>Unlimited: round timer</label><select id="sTimer">${[0, 30, 60, 120, 180].map(t => `<option value="${t}" ${t === +settings.timer ? 'selected' : ''}>${t ? t + ' seconds' : 'Off'}</option>`).join('')}</select></div>
+    <div><label>Distance units</label><select id="sUnits"><option value="mi" ${settings.units === 'mi' ? 'selected' : ''}>Miles</option><option value="km" ${settings.units === 'km' ? 'selected' : ''}>Kilometers</option></select></div>
+  </div>
+  <label>Monthly Street View limit (stops the game at this many loads; Google's free amount is 5,000)</label>
+  <input id="sCap" type="number" min="100" max="5000" step="100" value="${settings.cap}">
+  <div class="usage">This month in this browser: <b>${u.panos.toLocaleString()}</b> Street View loads · <b>${u.maps.toLocaleString()}</b> map loads
+    <div class="bar"><div style="width:${Math.min(100, u.panos / settings.cap * 100)}%"></div></div>
+    <span class="help">Only counts this browser. Your real total is in Google Cloud Console → Google Maps Platform → Metrics.</span></div>
+  <div class="btns" style="margin-top:14px;justify-content:flex-start"><button class="primary" id="sSave">Save</button></div>`);
+  $('#sSave').onclick = () => {
+    const newKey = $('#sKey').value.trim();
+    if (!newKey) { toast('Enter an API key'); return; }
+    const keyChanged = newKey !== settings.key;
+    Object.assign(settings, { key: newKey, pack: $('#sPack').value, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
+    LS.set('gc:settings', settings); closeModal();
+    if (keyChanged && G) { location.reload(); return; }
+    if (!game) startDaily(); else if (game.phase === 'play') hud(); else resume();
+  };
+}
+function setupSteps() {
+  return `<div class="help"><p>Geo Clue uses your own Google Maps key. A 5-round game uses about 5 of your 5,000 free Street View loads per month.</p><ol>
+  <li>Go to <a href="https://console.cloud.google.com/google/maps-apis/start" target="_blank">Google Cloud Console → Google Maps Platform</a> and create a project. Google requires billing to be set up, even for free usage.</li>
+  <li>Enable the <b>Maps JavaScript API</b>.</li>
+  <li>Under <b>Keys &amp; Credentials</b>, create an API key. Restrict it:<br>• Application restriction: <b>Websites</b> → add your site, e.g. <code>https://your-site.vercel.app/*</code><br>• API restriction: <b>Maps JavaScript API</b> only</li>
+  <li>Optional but recommended: set a <b>budget alert</b> (Billing → Budgets &amp; alerts) at $1, and lower the API's daily quota.</li>
+  <li>Paste the key below. It's saved only in this browser.</li></ol></div>`;
+}
+function openHelp() {
+  openModal(`<h2>How to play</h2><div class="help">
+  <p>You're dropped somewhere in Street View. Look around for clues (signs, which side of the road people drive on, plants, license plates) then click the map to place your guess.</p>
+  <p>Each round scores up to <b>5,000</b> points. The closer you are, the more you get. 5 rounds per game.</p>
+  <p><b>Daily</b>: same 5 world locations for everyone each day, moving allowed, no timer.<br><b>Unlimited</b>: pick a map, movement rule and timer in ⚙.</p>
+  <p><b>Moving</b> = walk around · <b>No move</b> = look around only · <b>NMPZ</b> = no moving, panning or zooming.</p>
+  <p>Hover the mini-map to make it bigger (tap 🗺 on phones). Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
+}
+function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
+function closeModal() { $('#modal').hidden = true; }
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
+$('#bDaily').onclick = () => startDaily();
+$('#bUnl').onclick = () => startUnlimited(game && game.mode === 'unl' && game.phase === 'final');
+$('#bStats').onclick = openStats;
+$('#bHelp').onclick = openHelp;
+$('#bSettings').onclick = () => openSettings(!settings.key);
+
+// ---------- init ----------
+startDaily();
+</script>
+</body>
+</html>
