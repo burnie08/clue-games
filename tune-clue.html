@@ -73,15 +73,43 @@ table.diffs td,table.diffs th{padding:5px 6px;border-bottom:1px solid #2f3442;te
 #toast.show{opacity:1}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
 @media (max-width:520px){.endcard{flex-direction:column;text-align:center}.btns{justify-content:center}}
+
+/* ---------- home + end screens ---------- */
+.screen{position:fixed;inset:0;z-index:40;background:radial-gradient(circle at 50% 0%,#1f2433 0%,var(--bg) 55%);overflow:auto;display:none;justify-content:center;align-items:flex-start;padding:36px 16px 40px}
+.screen.on{display:flex}
+.hwrap{width:100%;max-width:520px;text-align:center}
+.hicon{font-size:54px;line-height:1}
+.hlogo{font-size:44px;font-weight:800;letter-spacing:.5px;margin:6px 0 8px}.hlogo span{color:var(--accent)}
+.hlogo.small{font-size:22px;margin:0 0 10px}
+.tag{color:var(--muted);line-height:1.5;margin:0 0 20px}
+.today{background:var(--panel);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today b{font-size:16px}.today .d{color:var(--muted);font-size:13px;margin-top:2px}.today .big{font-size:30px}
+.hbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.hbtns button{padding:14px;font-size:17px;border-radius:12px}
+.hmini{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+.hmini button{padding:8px 14px;font-size:14px}
+.hstats{display:flex;gap:8px;margin-bottom:16px}
+.hstats div{flex:1;background:var(--panel);border-radius:10px;padding:8px;font-size:12px;color:var(--muted)}
+.hstats b{display:block;font-size:20px;color:var(--text)}
+.back{color:var(--muted);text-decoration:none;font-size:14px}.back:hover{color:var(--accent)}
+.endtitle{font-size:30px;font-weight:800;margin:0 0 4px}
+.endart{width:180px;max-width:60vw;border-radius:12px;box-shadow:0 10px 30px #0008;margin:6px auto 14px;display:block}
+.egrid{font-size:20px;line-height:1.25;letter-spacing:2px;margin:12px 0 16px;white-space:pre;overflow-x:auto}
+.seg{display:flex;background:var(--panel);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;background:none;padding:10px}
+.seg button.on{background:var(--accent);color:#1a1300;font-weight:700}
+.opts{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:16px;text-align:left}
+.optsTitle{font-weight:700;margin-bottom:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.grid3 select{padding:8px;font-size:14px}
+.logo{cursor:pointer}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Tune<span>Clue</span></div>
   <nav>
-    <button id="bDaily" class="on">Daily</button>
-    <button id="bUnl">Unlimited</button>
-    <button id="bReplay">Replay</button>
+    <button id="bHome">⌂ Home</button>
     <button id="bStats">Stats</button>
     <button id="bHelp">?</button>
     <button id="bSettings">⚙</button>
@@ -116,6 +144,23 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
 <footer>Song previews courtesy of Apple Music / iTunes. Personal use. · <a href="index.html">All games</a> · <a href="reel-clue.html">Play Reel Clue</a></footer>
 <div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
 <div id="toast"></div>
+<section id="home" class="screen"><div class="hwrap">
+  <div class="hicon">🎵</div>
+  <div class="hlogo">Tune<span>Clue</span></div>
+  <p class="tag">Name the song from a tiny clip. Every miss or skip plays a little more. Six tries.</p>
+  <div class="seg" id="hDiff"></div>
+  <p class="tag" id="hDiffDesc" style="font-size:13px;margin:8px 0 16px"></p>
+  <div class="today" id="todayCard"></div>
+  <div class="hbtns">
+    <button class="primary" id="hDaily">Play today's song</button>
+    <button id="hUnl">Unlimited · random songs</button>
+    <button id="hReplay">Replay the last 50 days</button>
+  </div>
+  <div id="hStatsRow"></div>
+  <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
+  <a class="back" href="index.html">← All games</a>
+</div></section>
+<section id="endS" class="screen"><div class="hwrap" id="endBody"></div></section>
 <audio id="au" preload="auto"></audio>
 
 <script>
@@ -822,7 +867,7 @@ function fresh(key, mode, song) { return { key, mode, song, diff: settings.diff,
 function startOffset() { return D().randomStart && !game.done ? hash(songKey(answer)) % 15 : 0; }
 
 async function startDaily(key) {
-  stopAudio();
+  stopAudio(); hideHome();
   const saved = LS.get(storeKey(key, settings.diff), null);
   if (saved && saved.sig === poolSig()) { game = saved; }
   else {
@@ -839,7 +884,7 @@ async function startDaily(key) {
   await loadGame();
 }
 async function startUnlimited(newOne) {
-  stopAudio();
+  stopAudio(); hideHome();
   let saved = LS.get(storeKey('unl', settings.diff), null);
   if (!saved || newOne || saved.sig !== poolSig()) {
     setStatus('Picking a song…');
@@ -854,7 +899,7 @@ async function startUnlimited(newOne) {
   await loadGame();
 }
 async function loadGame() {
-  answer = game.song;
+  answer = game.song; endDismissed = false;
   setStatus('Loading clip…');
   try { track = await resolveTrack(answer); } catch (e) { track = null; }
   if (!track) { setStatus('This song has no preview available. Try Unlimited or another day.'); return; }
@@ -891,21 +936,46 @@ function render() {
   renderEnd();
 }
 
+let endDismissed = false;
 function renderEnd() {
   const box = $('#end');
-  if (!game.done) { box.hidden = true; return; }
+  if (!game.done) { box.hidden = true; $('#endS').classList.remove('on'); return; }
   box.hidden = false;
-  const n = game.guesses.length;
   box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}">
-    ${track.art ? `<img src="${esc(track.art)}" alt="">` : ''}
-    <div><h2>${game.won ? (n === 1 ? 'First try! 🔥' : `Got it on try ${n}!`) : 'Not this time'}</h2>
-    <h3>${esc(answer.title)}</h3><p>${esc(answer.artist)}${track.year ? ' · ' + track.year : ''}</p>
-    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>
-    ${game.mode === 'unlimited' ? '<button id="nextBtn">Next song →</button>' : ''}
-    ${track.url ? `<a href="${esc(track.url)}" target="_blank">Open in Apple Music</a>` : ''}</div>
-    <p style="margin-top:10px">Press ▶ to hear the full preview.</p></div></div>`;
-  $('#shareBtn').onclick = () => copy(shareText());
-  if ($('#nextBtn')) $('#nextBtn').onclick = () => startUnlimited(true);
+    ${track.art ? `<img src="${esc(track.art)}" alt="" style="width:64px;height:64px">` : ''}
+    <div><h3>${esc(answer.title)}</h3><p>${esc(answer.artist)}</p>
+    <div class="btns"><button class="primary" id="sumBtn">Show summary</button><button id="homeBtn2">⌂ Back to home</button></div></div></div>`;
+  $('#sumBtn').onclick = openEnd;
+  $('#homeBtn2').onclick = showHome;
+  if (!endDismissed) openEnd();
+}
+function openEnd() {
+  const n = game.guesses.length, daily = game.mode !== 'unlimited';
+  const sq = { skip: '⬛', wrong: '🟥', artist: '🟨', correct: '🟩' };
+  const row = Array.from({ length: MAXT }, (_, i) => game.guesses[i] ? sq[game.guesses[i].type] : '⬜').join('');
+  $('#endBody').innerHTML = `
+    <div class="hlogo small">Tune<span>Clue</span></div>
+    <p class="endtitle">${game.won ? (n === 1 ? 'First try! 🔥' : `Got it on try ${n}! 🎉`) : 'Not this time'}</p>
+    <p class="tag" style="margin-bottom:8px">${daily ? niceDate(game.key) : 'Unlimited'} · ${D().name}</p>
+    ${track.art ? `<img class="endart" src="${esc(track.art)}" alt="">` : ''}
+    <h2 style="margin:0">${esc(answer.title)}</h2>
+    <p class="tag" style="margin:4px 0 0">${esc(answer.artist)}${track.year ? ' · ' + track.year : ''}</p>
+    <div class="egrid">🔊${row}</div>
+    ${daily ? statsRow(game.diff) : ''}
+    <div class="hbtns">
+      <button class="primary" id="ePlay">${playing ? '■ Stop' : '▶ Play the song'}</button>
+      <button id="eShare">Copy result</button>
+      ${daily ? '' : '<button id="eNext">Next song →</button>'}
+      <button id="eBoard">View my guesses</button>
+      <button id="eHome">⌂ Back to home</button>
+    </div>
+    ${track.url ? `<a class="back" href="${esc(track.url)}" target="_blank">Open in Apple Music</a>` : ''}`;
+  $('#ePlay').onclick = async () => { await playClip(); $('#ePlay').textContent = playing ? '■ Stop' : '▶ Play the song'; };
+  $('#eShare').onclick = () => copy(shareText());
+  if ($('#eNext')) $('#eNext').onclick = () => startUnlimited(true);
+  $('#eBoard').onclick = () => { endDismissed = true; $('#endS').classList.remove('on'); };
+  $('#eHome').onclick = showHome;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
 }
 
 function addGuess(g) {
@@ -915,7 +985,7 @@ function addGuess(g) {
   save();
   if (game.done && game.mode === 'daily') recordStat();
   stopAudio(); render();
-  if (game.done) setTimeout(() => playClip(), 300);
+  if (game.done) setTimeout(async () => { await playClip(); const ep = $('#ePlay'); if (ep) ep.textContent = playing ? '■ Stop' : '▶ Play the song'; }, 300);
 }
 function submit() {
   if (!game || game.done) return;
@@ -935,7 +1005,7 @@ $('#skip').onclick = () => { if (game && !game.done) addGuess({ type: 'skip' });
 
 // ---------- audio ----------
 let raf = null, playing = false;
-function stopAudio() { au.pause(); playing = false; cancelAnimationFrame(raf); $('#play').textContent = '▶'; $('#prog').style.width = '0'; $('#tNow').textContent = '0:00'; }
+function stopAudio() { au.pause(); playing = false; cancelAnimationFrame(raf); $('#play').textContent = '▶'; const ep = $('#ePlay'); if (ep) ep.textContent = '▶ Play the song'; $('#prog').style.width = '0'; $('#tNow').textContent = '0:00'; }
 async function playClip() {
   if (!track) return;
   if (playing) { stopAudio(); return; }
@@ -1039,7 +1109,7 @@ function openSettings() {
     settings.custom = $('#sCustom').value; settings.useCustom = $('#sUse').checked; settings.country = $('#sCountry').value;
     LS.set('tc:settings', settings); POOL = getPool(); closeModal();
     toast(`Song pool: ${POOL.length} songs`);
-    startDaily(dateKey(new Date()));
+    showHome();
   };
 }
 function openHelp() {
@@ -1057,17 +1127,47 @@ function closeModal() { $('#modal').hidden = true; }
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
-$('#bDaily').onclick = () => startDaily(dateKey(new Date()));
-$('#bUnl').onclick = () => startUnlimited(false);
-$('#bReplay').onclick = openReplay;
+$('#bHome').onclick = showHome;
+$('.logo').onclick = showHome;
 $('#bStats').onclick = openStats;
 $('#bHelp').onclick = openHelp;
 $('#bSettings').onclick = openSettings;
 
+// ---------- home screen ----------
+
+function statsRowHtml(a, b, c) { return `<div class="hstats"><div><b>${a[0]}</b>${a[1]}</div><div><b>${b[0]}</b>${b[1]}</div><div><b>${c[0]}</b>${c[1]}</div></div>`; }
+function streakOf(s) { let n = 0; const d = new Date(); if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1); while (s[dateKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); } return n; }
+
+function statsRow(dk) {
+  const s = LS.get(statsKey(dk), {}), v = Object.values(s), wins = v.filter(x => x > 0).length;
+  return statsRowHtml([v.length, 'Played'], [(v.length ? Math.round(wins / v.length * 100) : 0) + '%', 'Win rate'], [streakOf(s), 'Streak']);
+}
+function showHome() { stopAudio(); $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
+function renderHome() {
+  $('#hDiff').innerHTML = Object.entries(DIFFS).map(([k, d]) => `<button data-d="${k}" class="${k === settings.diff ? 'on' : ''}">${d.name}</button>`).join('');
+  $('#hDiff').querySelectorAll('button').forEach(b => b.onclick = () => { settings.diff = b.dataset.d; LS.set('tc:settings', settings); POOL = getPool(); renderHome(); });
+  $('#hDiffDesc').textContent = DIFFS[settings.diff].desc;
+  const today = dateKey(new Date()), g = LS.get(storeKey(today, settings.diff), null), dn = DIFFS[settings.diff].name;
+  let status, icon = '🎵', label;
+  if (!g || !g.guesses.length) { status = `<b>Today's ${dn} song is waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's song"; }
+  else if (!g.done) { status = `<b>In progress · try ${g.guesses.length + 1}/6</b><div class="d">${niceDate(today)} · ${dn}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else { status = `<b>${g.won ? `Got it on try ${g.guesses.length}` : 'Missed today'}</b><div class="d">${niceDate(today)} · ${dn} · try another difficulty</div>`; icon = g.won ? '✅' : '❌'; label = "See today's result"; }
+  $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  $('#hDaily').textContent = label;
+  $('#hStatsRow').innerHTML = statsRow(settings.diff);
+}
+$('#hDaily').onclick = () => startDaily(dateKey(new Date())).catch(e => setStatus(e.message));
+$('#hUnl').onclick = () => startUnlimited(false);
+$('#hReplay').onclick = openReplay;
+$('#hHow').onclick = openHelp;
+$('#hStats').onclick = openStats;
+$('#hSet').onclick = openSettings;
+
 // ---------- init ----------
 (function init() {
+  showHome();
   if (!LS.get('tc:seenHelp2', false)) { LS.set('tc:seenHelp2', true); openHelp(); }
-  startDaily(dateKey(new Date())).catch(e => setStatus(e.message));
 })();
 </script>
 </body>

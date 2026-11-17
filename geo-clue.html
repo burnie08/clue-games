@@ -72,14 +72,43 @@ nav button.on{background:var(--accent);color:#1a1300}
   #mapToggle{display:block}
   #resPanel{bottom:10px;min-width:0;width:92vw}
 }
+
+/* ---------- home + end screens ---------- */
+.screen{position:fixed;inset:0;z-index:40;background:radial-gradient(circle at 50% 0%,#1f2433 0%,var(--bg) 55%);overflow:auto;display:none;justify-content:center;align-items:flex-start;padding:36px 16px 40px}
+.screen.on{display:flex}
+.hwrap{width:100%;max-width:520px;text-align:center}
+.hicon{font-size:54px;line-height:1}
+.hlogo{font-size:44px;font-weight:800;letter-spacing:.5px;margin:6px 0 8px}.hlogo span{color:var(--accent)}
+.hlogo.small{font-size:22px;margin:0 0 10px}
+.tag{color:var(--muted);line-height:1.5;margin:0 0 20px}
+.today{background:var(--panel);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today b{font-size:16px}.today .d{color:var(--muted);font-size:13px;margin-top:2px}.today .big{font-size:30px}
+.hbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.hbtns button{padding:14px;font-size:17px;border-radius:12px}
+.hmini{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+.hmini button{padding:8px 14px;font-size:14px}
+.hstats{display:flex;gap:8px;margin-bottom:16px}
+.hstats div{flex:1;background:var(--panel);border-radius:10px;padding:8px;font-size:12px;color:var(--muted)}
+.hstats b{display:block;font-size:20px;color:var(--text)}
+.back{color:var(--muted);text-decoration:none;font-size:14px}.back:hover{color:var(--accent)}
+.endtitle{font-size:30px;font-weight:800;margin:0 0 4px}
+.endart{width:180px;max-width:60vw;border-radius:12px;box-shadow:0 10px 30px #0008;margin:6px auto 14px;display:block}
+.egrid{font-size:20px;line-height:1.25;letter-spacing:2px;margin:12px 0 16px;white-space:pre;overflow-x:auto}
+.seg{display:flex;background:var(--panel);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;background:none;padding:10px}
+.seg button.on{background:var(--accent);color:#1a1300;font-weight:700}
+.opts{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:16px;text-align:left}
+.optsTitle{font-weight:700;margin-bottom:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.grid3 select{padding:8px;font-size:14px}
+.logo{cursor:pointer}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Geo<span>Clue</span></div>
   <nav>
-    <button id="bDaily" class="on">Daily</button>
-    <button id="bUnl">Unlimited</button>
+    <button id="bHome">⌂ Home</button>
     <button id="bStats">Stats</button>
     <button id="bHelp">?</button>
     <button id="bSettings">⚙</button>
@@ -105,6 +134,22 @@ nav button.on{background:var(--accent);color:#1a1300}
 </div>
 <div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
 <div id="toast"></div>
+<section id="home" class="screen"><div class="hwrap">
+  <div class="hicon">🌍</div>
+  <div class="hlogo">Geo<span>Clue</span></div>
+  <p class="tag">You're dropped somewhere in Street View. Look for clues, then pin where you think you are. 5 rounds, up to 5,000 points each.</p>
+  <div class="today" id="todayCard"></div>
+  <div class="hbtns"><button class="primary" id="hDaily">Play today's 5 locations</button></div>
+  <div class="opts">
+    <div class="optsTitle">Unlimited</div>
+    <div class="grid3"><select id="hPack" title="Map"></select><select id="hMove" title="Movement"></select><select id="hTimer" title="Round timer"></select></div>
+    <button id="hUnl" style="width:100%;margin-top:8px">Play Unlimited</button>
+  </div>
+  <div id="hStatsRow"></div>
+  <p class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></p>
+  <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
+  <a class="back" href="index.html">← All games</a>
+</div></section>
 
 <script>
 // ============================================================
@@ -240,6 +285,7 @@ async function boot() {
   catch (e) { showMsg(esc(e.message)); return false; }
 }
 async function startDaily() {
+  hideHome();
   if (!(await boot())) return;
   const key = dateKey(new Date());
   setNav('bDaily');
@@ -254,10 +300,11 @@ async function startDaily() {
   save(); resume();
 }
 async function startUnlimited(fresh) {
+  hideHome();
   if (!(await boot())) return;
   setNav('bUnl');
   const saved = LS.get('gc:g:unl', null);
-  if (saved && !fresh && saved.phase !== 'final') { game = saved; return resume(); }
+  if (!fresh && unlMatches(saved)) { game = saved; return resume(); }
   showMsg(`Finding 5 locations in ${esc(PACKS[settings.pack].name)}…`);
   const rng = mulberry32((Math.random() * 2 ** 32) >>> 0);
   const rounds = [];
@@ -363,14 +410,15 @@ function showFinal() {
   clearResultLayers();
   const b = new G.LatLngBounds(); game.rounds.forEach((r, i) => drawRoundOnMap(r, i, b)); map.fitBounds(b, 60);
   const t = total();
-  $('#resPanel').innerHTML = `<h2>${t.toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 25,000</span></h2>
+  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Final score · ${game.mode === 'daily' ? niceDate(game.key) : esc(P().name) + ' · ' + MOVES[game.move]}</div><h2>${t.toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 25,000</span></h2>
     <div class="bar"><div style="width:${t / 250}%"></div></div>
     <div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(r.region)}</a></span><span>${r.guess ? fmtDist(r.km) : '—'} · <b>${(r.pts || 0).toLocaleString()}</b></span></div>`).join('')}</div>
-    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>${game.mode === 'daily' ? '<button id="playUnl">Play Unlimited →</button>' : '<button id="againBtn">New game →</button>'}</div>`;
+    ${game.mode === 'daily' ? statsRow() : ''}
+    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>${game.mode === 'daily' ? '' : '<button id="againBtn">New game →</button>'}<button id="homeBtn">⌂ Back to home</button></div>`;
   $('#resPanel').classList.add('on');
   $('#shareBtn').onclick = () => copy(shareText());
   if ($('#againBtn')) $('#againBtn').onclick = () => startUnlimited(true);
-  if ($('#playUnl')) $('#playUnl').onclick = () => startUnlimited(false);
+  $('#homeBtn').onclick = showHome;
 }
 function shareText() {
   const sq = p => p >= 4000 ? '🟩' : p >= 2000 ? '🟨' : p >= 500 ? '🟧' : '🟥';
@@ -388,7 +436,7 @@ $('#guessBtn').onclick = () => makeGuess(false);
 $('#mapToggle').onclick = () => $('#mapBox').classList.toggle('open');
 $('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(0); } };
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || homeOn() || !$('#modal').hidden) return;
   if ((e.key === ' ' || e.key === 'Enter') && game) {
     if (game.phase === 'play' && !$('#guessBtn').disabled) { e.preventDefault(); makeGuess(false); }
     else if (game.phase === 'result' && $('#nextBtn')) { e.preventDefault(); $('#nextBtn').click(); }
@@ -429,7 +477,10 @@ function openSettings(first) {
     Object.assign(settings, { key: newKey, pack: $('#sPack').value, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
     LS.set('gc:settings', settings); closeModal();
     if (keyChanged && G) { location.reload(); return; }
-    if (!game) startDaily(); else if (game.phase === 'play') hud(); else resume();
+    if (first) startDaily();
+    else if (homeOn()) renderHome();
+    else if (game && game.phase === 'play') hud();
+    else if (game) resume();
   };
 }
 function setupSteps() {
@@ -453,14 +504,56 @@ function closeModal() { $('#modal').hidden = true; }
 $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
-$('#bDaily').onclick = () => startDaily();
-$('#bUnl').onclick = () => startUnlimited(game && game.mode === 'unl' && game.phase === 'final');
+$('#bHome').onclick = showHome;
+$('.logo').onclick = showHome;
 $('#bStats').onclick = openStats;
 $('#bHelp').onclick = openHelp;
 $('#bSettings').onclick = () => openSettings(!settings.key);
 
+// ---------- home screen (Google Maps isn't loaded until you press play) ----------
+
+function statsRowHtml(a, b, c) { return `<div class="hstats"><div><b>${a[0]}</b>${a[1]}</div><div><b>${b[0]}</b>${b[1]}</div><div><b>${c[0]}</b>${c[1]}</div></div>`; }
+function streakOf(s) { let n = 0; const d = new Date(); if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1); while (s[dateKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); } return n; }
+
+function statsRow() {
+  const v = Object.values(LS.get('gc:stats', {})), avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  return statsRowHtml([v.length, 'Dailies'], [avg.toLocaleString(), 'Average'], [(v.length ? Math.max(...v) : 0).toLocaleString(), 'Best']);
+}
+function homeOn() { return $('#home').classList.contains('on'); }
+function showHome() { clearInterval(timerId); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function hideHome() { $('#home').classList.remove('on'); }
+function unlMatches(g) { return g && g.phase !== 'final' && g.pack === settings.pack && g.move === settings.move && g.timer === +settings.timer; }
+function renderHome() {
+  const today = dateKey(new Date()), g = LS.get('gc:g:' + today, null);
+  let status, icon = '🌍', label;
+  if (!settings.key) { status = '<b>Quick setup needed</b><div class="d">Add your Google Maps API key to start</div>'; icon = '🔑'; label = 'Set up & play'; }
+  else if (!g) { status = `<b>Today's 5 locations are waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's 5 locations"; }
+  else if (g.phase !== 'final') { status = `<b>In progress · round ${g.idx + 1}/5</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else { const t = g.rounds.reduce((a, r) => a + (r.pts || 0), 0); status = `<b>${t.toLocaleString()} / 25,000</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = t >= 20000 ? '🏆' : '✅'; label = "See today's result"; }
+  $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  $('#hDaily').textContent = label;
+  const fill = (id, entries, val) => { $(id).innerHTML = entries.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join(''); };
+  fill('#hPack', Object.entries(PACKS).map(([k, p]) => [k, p.name]), settings.pack);
+  fill('#hMove', Object.entries(MOVES), settings.move);
+  fill('#hTimer', [0, 30, 60, 120, 180].map(t => [t, t ? `⏱ ${t}s` : 'No timer']), settings.timer);
+  $('#hUnl').textContent = unlMatches(LS.get('gc:g:unl', null)) ? 'Continue Unlimited game' : 'Play Unlimited';
+  $('#hStatsRow').innerHTML = statsRow();
+  const u = usage();
+  $('#hUsage').textContent = settings.key ? `Street View loads this month: ${u.panos.toLocaleString()} of your ${settings.cap.toLocaleString()} limit` : '';
+}
+['#hPack', '#hMove', '#hTimer'].forEach(id => $(id).onchange = () => {
+  Object.assign(settings, { pack: $('#hPack').value, move: $('#hMove').value, timer: +$('#hTimer').value });
+  LS.set('gc:settings', settings); renderHome();
+});
+const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
+$('#hDaily').onclick = needKey(() => startDaily());
+$('#hUnl').onclick = needKey(() => startUnlimited(false));
+$('#hHow').onclick = openHelp;
+$('#hStats').onclick = openStats;
+$('#hSet').onclick = () => openSettings(!settings.key);
+
 // ---------- init ----------
-startDaily();
+showHome();
 </script>
 </body>
 </html>

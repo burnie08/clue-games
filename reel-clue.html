@@ -99,15 +99,43 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
   .tile .lbl{display:block}
   .endcard{flex-direction:column}
 }
+
+/* ---------- home + end screens ---------- */
+.screen{position:fixed;inset:0;z-index:40;background:radial-gradient(circle at 50% 0%,#1f2433 0%,var(--bg) 55%);overflow:auto;display:none;justify-content:center;align-items:flex-start;padding:36px 16px 40px}
+.screen.on{display:flex}
+.hwrap{width:100%;max-width:520px;text-align:center}
+.hicon{font-size:54px;line-height:1}
+.hlogo{font-size:44px;font-weight:800;letter-spacing:.5px;margin:6px 0 8px}.hlogo span{color:var(--accent)}
+.hlogo.small{font-size:22px;margin:0 0 10px}
+.tag{color:var(--muted);line-height:1.5;margin:0 0 20px}
+.today{background:var(--panel);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today b{font-size:16px}.today .d{color:var(--muted);font-size:13px;margin-top:2px}.today .big{font-size:30px}
+.hbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.hbtns button{padding:14px;font-size:17px;border-radius:12px}
+.hmini{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+.hmini button{padding:8px 14px;font-size:14px}
+.hstats{display:flex;gap:8px;margin-bottom:16px}
+.hstats div{flex:1;background:var(--panel);border-radius:10px;padding:8px;font-size:12px;color:var(--muted)}
+.hstats b{display:block;font-size:20px;color:var(--text)}
+.back{color:var(--muted);text-decoration:none;font-size:14px}.back:hover{color:var(--accent)}
+.endtitle{font-size:30px;font-weight:800;margin:0 0 4px}
+.endart{width:180px;max-width:60vw;border-radius:12px;box-shadow:0 10px 30px #0008;margin:6px auto 14px;display:block}
+.egrid{font-size:20px;line-height:1.25;letter-spacing:2px;margin:12px 0 16px;white-space:pre;overflow-x:auto}
+.seg{display:flex;background:var(--panel);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;background:none;padding:10px}
+.seg button.on{background:var(--accent);color:#1a1300;font-weight:700}
+.opts{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:16px;text-align:left}
+.optsTitle{font-weight:700;margin-bottom:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.grid3 select{padding:8px;font-size:14px}
+.logo{cursor:pointer}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">Reel<span>Clue</span></div>
   <nav>
-    <button id="bDaily" class="on">Daily</button>
-    <button id="bUnl">Unlimited</button>
-    <button id="bRewatch">Rewatch</button>
+    <button id="bHome">⌂ Home</button>
     <button id="bStats">Stats</button>
     <button id="bHelp">?</button>
     <button id="bSettings">⚙</button>
@@ -128,6 +156,22 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
 <footer>Movie data from <a href="https://www.themoviedb.org/" target="_blank">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB. Personal use. · <a href="tune-clue.html">Play Tune Clue</a></footer>
 <div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
 <div id="toast"></div>
+
+<section id="home" class="screen"><div class="hwrap">
+  <div class="hicon">🎬</div>
+  <div class="hlogo">Reel<span>Clue</span></div>
+  <p class="tag">Guess the mystery movie in 10 tries. Each guess shows how close you are on genre, year, box office, score, rating, studio, director and cast.</p>
+  <div class="today" id="todayCard"></div>
+  <div class="hbtns">
+    <button class="primary" id="hDaily">Play today's movie</button>
+    <button id="hUnl">Unlimited · random movies</button>
+    <button id="hRewatch">Rewatch the last 50 days</button>
+  </div>
+  <div id="hStatsRow"></div>
+  <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
+  <a class="back" href="index.html">← All games</a>
+</div></section>
+<section id="endS" class="screen"><div class="hwrap" id="endBody"></div></section>
 
 <script>
 // ---------- helpers ----------
@@ -288,6 +332,7 @@ function addRow(g, animate) {
 function save() { LS.set('rc:g:' + game.key, game); }
 
 async function startDaily(key) {
+  hideHome();
   const ids = shuffled(await getPool());
   const answerId = ids[dayNum(key) % ids.length];
   const saved = LS.get('rc:g:' + key, null);
@@ -296,6 +341,7 @@ async function startDaily(key) {
   await loadGame();
 }
 async function startUnlimited(fresh) {
+  hideHome();
   let saved = LS.get('rc:g:unl', null);
   if (!saved || fresh) {
     const ids = await getPool();
@@ -306,7 +352,7 @@ async function startUnlimited(fresh) {
   await loadGame();
 }
 async function loadGame() {
-  setStatus('Loading…');
+  setStatus('Loading…'); endDismissed = false;
   $('#rows').innerHTML = ''; emojiRows = [];
   answer = await getMovie(game.answerId);
   const gs = await Promise.all(game.guesses.map(getMovie));
@@ -369,20 +415,42 @@ async function copy(t) {
   toast('Copied!');
 }
 
+let endDismissed = false;
 function renderEnd() {
   const box = $('#end');
-  if (!game.done) { box.hidden = true; return; }
+  if (!game.done) { box.hidden = true; $('#endS').classList.remove('on'); return; }
   box.hidden = false;
-  box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}">
-    ${answer.poster ? `<img src="${IMG}w342${answer.poster}" alt="">` : ''}
-    <div><h2>${game.won ? `Got it in ${game.guesses.length}!` : 'Out of guesses'}</h2>
-    <h3>${esc(answer.title)} (${answer.year || '?'})</h3>
-    <p>${esc(answer.overview)}</p>
-    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>
-    ${game.mode === 'unlimited' ? '<button id="nextBtn">Next film →</button>' : ''}
-    <a href="https://www.themoviedb.org/movie/${answer.id}" target="_blank">View on TMDB</a></div></div></div>`;
-  $('#shareBtn').onclick = () => copy(shareText());
-  if ($('#nextBtn')) $('#nextBtn').onclick = () => startUnlimited(true).catch(e => setStatus(e.message));
+  box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}" style="align-items:center">
+    ${answer.poster ? `<img src="${IMG}w154${answer.poster}" alt="" style="width:64px">` : ''}
+    <div><h3>${esc(answer.title)} (${answer.year || '?'})</h3>
+    <div class="btns"><button class="primary" id="sumBtn">Show summary</button><button id="homeBtn2">⌂ Back to home</button></div></div></div>`;
+  $('#sumBtn').onclick = openEnd;
+  $('#homeBtn2').onclick = showHome;
+  if (!endDismissed) openEnd();
+}
+function openEnd() {
+  const n = game.guesses.length, daily = game.mode !== 'unlimited';
+  $('#endBody').innerHTML = `
+    <div class="hlogo small">Reel<span>Clue</span></div>
+    <p class="endtitle">${game.won ? `Got it in ${n}! 🎉` : 'Out of guesses'}</p>
+    <p class="tag" style="margin-bottom:8px">${daily ? niceDate(game.key) : 'Unlimited'}${game.hints.some(x => x) ? ' · hints used' : ''}</p>
+    ${answer.poster ? `<img class="endart" src="${IMG}w342${answer.poster}" alt="">` : ''}
+    <h2 style="margin:0 0 6px">${esc(answer.title)} <span style="color:var(--muted);font-weight:400">(${answer.year || '?'})</span></h2>
+    <p class="tag" style="font-size:14px">${esc(answer.overview)}</p>
+    <div class="egrid">${emojiRows.join('\n')}</div>
+    ${daily ? statsRow() : ''}
+    <div class="hbtns">
+      <button class="primary" id="eShare">Copy result</button>
+      ${daily ? '' : '<button id="eNext">Next film →</button>'}
+      <button id="eBoard">View my guesses</button>
+      <button id="eHome">⌂ Back to home</button>
+    </div>
+    <a class="back" href="https://www.themoviedb.org/movie/${answer.id}" target="_blank">View on TMDB</a>`;
+  $('#eShare').onclick = () => copy(shareText());
+  if ($('#eNext')) $('#eNext').onclick = () => startUnlimited(true).catch(e => setStatus(e.message));
+  $('#eBoard').onclick = () => { endDismissed = true; $('#endS').classList.remove('on'); };
+  $('#eHome').onclick = showHome;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
 }
 
 // ---------- stats ----------
@@ -427,9 +495,10 @@ function openSettings(first) {
     settings.key = $('#sKey').value.trim(); settings.region = $('#sRegion').value; settings.poolSize = +$('#sPool').value;
     if (!settings.key) { toast('Enter a key'); return; }
     LS.set('rc:settings', settings); closeModal();
-    try { await startDaily(dateKey(new Date())); } catch (e) { setStatus(e.message); }
+    if (first) { try { await startDaily(dateKey(new Date())); } catch (e) { setStatus(e.message); } }
+    else showHome();
   };
-  if ($('#sRebuild')) $('#sRebuild').onclick = async () => { closeModal(); try { await getPool(true); await startDaily(dateKey(new Date())); } catch (e) { setStatus(e.message); } };
+  if ($('#sRebuild')) $('#sRebuild').onclick = async () => { closeModal(); showHome(); toast('Rebuilding film pool…'); try { await getPool(true); toast('Film pool rebuilt'); } catch (e) { toast(e.message); } };
 }
 function openHelp() {
   openModal(`<h2>How to play</h2><div class="help">
@@ -454,12 +523,41 @@ $('#mclose').onclick = closeModal;
 $('#modal').onclick = e => { if (e.target.id === 'modal' && settings.key) closeModal(); };
 
 function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
-$('#bDaily').onclick = () => startDaily(dateKey(new Date())).catch(e => setStatus(e.message));
-$('#bUnl').onclick = () => startUnlimited(false).catch(e => setStatus(e.message));
-$('#bRewatch').onclick = openRewatch;
+$('#bHome').onclick = showHome;
+$('.logo').onclick = showHome;
 $('#bStats').onclick = openStats;
 $('#bHelp').onclick = openHelp;
 $('#bSettings').onclick = () => openSettings(false);
+
+// ---------- home screen ----------
+
+function statsRowHtml(a, b, c) { return `<div class="hstats"><div><b>${a[0]}</b>${a[1]}</div><div><b>${b[0]}</b>${b[1]}</div><div><b>${c[0]}</b>${c[1]}</div></div>`; }
+function streakOf(s) { let n = 0; const d = new Date(); if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1); while (s[dateKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); } return n; }
+
+function statsRow() {
+  const s = LS.get('rc:stats', {}), v = Object.values(s), wins = v.filter(x => x > 0).length;
+  return statsRowHtml([v.length, 'Played'], [(v.length ? Math.round(wins / v.length * 100) : 0) + '%', 'Win rate'], [streakOf(s), 'Streak']);
+}
+function showHome() { $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
+function renderHome() {
+  const today = dateKey(new Date()), g = LS.get('rc:g:' + today, null);
+  let status, icon = '🎬', label;
+  if (!settings.key) { status = '<b>Quick setup needed</b><div class="d">Add a free TMDB key to start playing</div>'; icon = '🔑'; label = 'Set up & play'; }
+  else if (!g || !g.guesses.length) { status = `<b>Today's movie is waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's movie"; }
+  else if (!g.done) { status = `<b>In progress · ${g.guesses.length}/10 guesses</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else { status = `<b>${g.won ? `Solved in ${g.guesses.length}` : 'Missed today'}</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = g.won ? '✅' : '❌'; label = "See today's result"; }
+  $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  $('#hDaily').textContent = label;
+  $('#hStatsRow').innerHTML = statsRow();
+}
+const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
+$('#hDaily').onclick = needKey(() => startDaily(dateKey(new Date())).catch(e => setStatus(e.message)));
+$('#hUnl').onclick = needKey(() => startUnlimited(false).catch(e => setStatus(e.message)));
+$('#hRewatch').onclick = needKey(openRewatch);
+$('#hHow').onclick = openHelp;
+$('#hStats').onclick = openStats;
+$('#hSet').onclick = () => openSettings(!settings.key);
 
 // ---------- search ----------
 let sTimer = null, sel = -1, results = [], sToken = 0;
@@ -497,11 +595,7 @@ q.addEventListener('keydown', e => {
 q.addEventListener('blur', () => setTimeout(() => drop.hidden = true, 150));
 
 // ---------- init ----------
-(async function init() {
-  if (!settings.key) { openSettings(true); return; }
-  try { await startDaily(dateKey(new Date())); }
-  catch (e) { setStatus(e.message + ' — check your key in ⚙ settings.'); }
-})();
+showHome();
 </script>
 </body>
 </html>
