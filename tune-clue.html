@@ -19,7 +19,8 @@ header{display:flex;align-items:center;justify-content:space-between;gap:10px;pa
 nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
 nav button.on{background:var(--accent);color:#1a1300}
 main{max-width:640px;margin:0 auto;padding:16px}
-.bar{display:flex;justify-content:space-between;color:var(--muted);margin-bottom:12px}.bar b{color:var(--text)}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;color:var(--muted);margin-bottom:12px}.bar b{color:var(--text)}
+.bar select{width:auto;padding:5px 8px;font-size:14px}
 #status{color:var(--muted);min-height:20px;margin:6px 0;text-align:center}
 .slots{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 .slot{height:42px;border:1px solid #2f3442;border-radius:8px;display:flex;align-items:center;padding:0 12px;gap:8px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -53,7 +54,7 @@ main{max-width:640px;margin:0 auto;padding:16px}
 .btns{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
 #modal[hidden]{display:none}
-.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow:auto;position:relative}
+.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:540px;width:100%;max-height:90vh;overflow:auto;position:relative}
 .mbox h2{margin-top:0}.mbox .close{position:absolute;right:10px;top:10px;background:none;font-size:22px}
 .mbox label{display:block;margin:12px 0 4px;color:var(--muted);font-size:13px}
 .help{color:var(--muted);font-size:13px;line-height:1.5}
@@ -66,6 +67,8 @@ main{max-width:640px;margin:0 auto;padding:16px}
 .dist .b{background:var(--green);padding:2px 6px;border-radius:4px;min-width:22px;text-align:right}
 .days{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px}
 .days button{text-align:left;font-size:13px;padding:8px}.days button small{display:block;color:var(--muted)}
+table.diffs{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0}
+table.diffs td,table.diffs th{padding:5px 6px;border-bottom:1px solid #2f3442;text-align:left}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
 #toast.show{opacity:1}
 footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
@@ -85,7 +88,11 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
   </nav>
 </header>
 <main>
-  <div class="bar"><span id="modeLbl"></span><span>Try <b id="count">1</b>/6</span></div>
+  <div class="bar">
+    <span id="modeLbl"></span>
+    <select id="diff" title="Difficulty"><option value="easy">Easy</option><option value="normal">Normal</option><option value="hard">Hard</option></select>
+    <span>Try <b id="count">1</b>/6</span>
+  </div>
   <div class="slots" id="slots"></div>
   <div id="end" hidden></div>
   <div class="player">
@@ -106,299 +113,612 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
     <div class="actions"><button id="skip">Skip</button><button id="submit" class="primary">Submit</button></div>
   </div>
 </main>
-<footer>Song previews courtesy of Apple Music / iTunes. Personal use. · <a href="reel-clue.html">Play Reel Clue</a></footer>
+<footer>Song previews courtesy of Apple Music / iTunes. Personal use. · <a href="index.html">All games</a> · <a href="reel-clue.html">Play Reel Clue</a></footer>
 <div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
 <div id="toast"></div>
 <audio id="au" preload="auto"></audio>
 
 <script>
-// ---------- built-in song list: era|artist|title ----------
+// ============================================================
+// SONG LIST — one per line:  era | genre | tier | artist | title
+//   era:   classic, 80s, 90s, 2000s, 2010s, 2020s
+//   genre: pop, rock, alt, hiphop, rnb, country, dance
+//   tier:  1 = mega-hit, 2 = well known, 3 = deeper cut
+// To add songs, just add lines in the same format.
+// ============================================================
 const SONGS_RAW = `
-classic|The Beatles|Hey Jude
-classic|The Beatles|Let It Be
-classic|The Beatles|Here Comes the Sun
-classic|The Rolling Stones|(I Can't Get No) Satisfaction
-classic|The Beach Boys|Good Vibrations
-classic|Aretha Franklin|Respect
-classic|The Temptations|My Girl
-classic|Marvin Gaye|I Heard It Through the Grapevine
-classic|Ben E. King|Stand by Me
-classic|Creedence Clearwater Revival|Fortunate Son
-classic|Simon & Garfunkel|Mrs. Robinson
-classic|The Animals|The House of the Rising Sun
-classic|Van Morrison|Brown Eyed Girl
-classic|Otis Redding|(Sittin' On) The Dock of the Bay
-classic|The Monkees|Daydream Believer
-classic|The Jackson 5|I Want You Back
-classic|Queen|Bohemian Rhapsody
-classic|Queen|Don't Stop Me Now
-classic|ABBA|Dancing Queen
-classic|Fleetwood Mac|Dreams
-classic|Fleetwood Mac|Go Your Own Way
-classic|Eagles|Hotel California
-classic|Led Zeppelin|Stairway to Heaven
-classic|Elton John|Tiny Dancer
-classic|Elton John|Rocket Man
-classic|Bee Gees|Stayin' Alive
-classic|Gloria Gaynor|I Will Survive
-classic|Lynyrd Skynyrd|Sweet Home Alabama
-classic|Stevie Wonder|Superstition
-classic|Bill Withers|Lean on Me
-classic|Earth, Wind & Fire|September
-classic|David Bowie|Heroes
-classic|Boston|More Than a Feeling
-classic|Steve Miller Band|The Joker
-classic|Billy Joel|Piano Man
-classic|Bruce Springsteen|Born to Run
-classic|Don McLean|American Pie
-classic|John Lennon|Imagine
-classic|Kansas|Carry On Wayward Son
-classic|Blue Öyster Cult|(Don't Fear) The Reaper
-classic|Electric Light Orchestra|Mr. Blue Sky
-classic|AC/DC|Highway to Hell
-classic|Pink Floyd|Wish You Were Here
-classic|Chic|Le Freak
-classic|The Doors|Light My Fire
-classic|Neil Diamond|Sweet Caroline
-80s|Michael Jackson|Billie Jean
-80s|Michael Jackson|Beat It
-80s|Michael Jackson|Thriller
-80s|Prince|Purple Rain
-80s|Madonna|Like a Prayer
-80s|Whitney Houston|I Wanna Dance with Somebody (Who Loves Me)
-80s|Journey|Don't Stop Believin'
-80s|Bon Jovi|Livin' on a Prayer
-80s|Toto|Africa
-80s|a-ha|Take On Me
-80s|Cyndi Lauper|Girls Just Want to Have Fun
-80s|Queen|Another One Bites the Dust
-80s|Survivor|Eye of the Tiger
-80s|Guns N' Roses|Sweet Child O' Mine
-80s|Def Leppard|Pour Some Sugar On Me
-80s|Tears for Fears|Everybody Wants to Rule the World
-80s|Wham!|Wake Me Up Before You Go-Go
-80s|Rick Astley|Never Gonna Give You Up
-80s|Kenny Loggins|Footloose
-80s|Daryl Hall & John Oates|You Make My Dreams
-80s|Simple Minds|Don't You (Forget About Me)
-80s|The Police|Every Breath You Take
-80s|Eurythmics|Sweet Dreams (Are Made of This)
-80s|Dexys Midnight Runners|Come On Eileen
-80s|Bruce Springsteen|Dancing in the Dark
-80s|U2|With or Without You
-80s|AC/DC|Back in Black
-80s|Van Halen|Jump
-80s|Huey Lewis & The News|The Power of Love
-80s|Pat Benatar|Hit Me with Your Best Shot
-80s|Joan Jett & The Blackhearts|I Love Rock 'N Roll
-80s|Phil Collins|In the Air Tonight
-80s|Lionel Richie|All Night Long (All Night)
-80s|Billy Idol|White Wedding
-80s|The Cure|Just Like Heaven
-80s|Bonnie Tyler|Total Eclipse of the Heart
-80s|Europe|The Final Countdown
-80s|Talking Heads|Once in a Lifetime
-80s|Duran Duran|Hungry Like the Wolf
-80s|Belinda Carlisle|Heaven Is a Place on Earth
-80s|Starship|We Built This City
-80s|Billy Joel|Uptown Girl
-80s|Bon Jovi|You Give Love a Bad Name
-80s|George Michael|Faith
-80s|Kenny Loggins|Danger Zone
-80s|Men At Work|Down Under
-90s|Nirvana|Smells Like Teen Spirit
-90s|Oasis|Wonderwall
-90s|Backstreet Boys|I Want It That Way
-90s|Britney Spears|...Baby One More Time
-90s|Spice Girls|Wannabe
-90s|TLC|No Scrubs
-90s|TLC|Waterfalls
-90s|Mariah Carey|Fantasy
-90s|Whitney Houston|I Will Always Love You
-90s|Alanis Morissette|Ironic
-90s|R.E.M.|Losing My Religion
-90s|Red Hot Chili Peppers|Under the Bridge
-90s|Coolio|Gangsta's Paradise
-90s|Dr. Dre|Still D.R.E.
-90s|The Notorious B.I.G.|Juicy
-90s|Will Smith|Gettin' Jiggy Wit It
-90s|Celine Dion|My Heart Will Go On
-90s|Third Eye Blind|Semi-Charmed Life
-90s|Goo Goo Dolls|Iris
-90s|Matchbox Twenty|3AM
-90s|Smash Mouth|All Star
-90s|Weezer|Buddy Holly
-90s|Green Day|Basket Case
-90s|The Verve|Bitter Sweet Symphony
-90s|Radiohead|Creep
-90s|Pearl Jam|Alive
-90s|Hanson|MMMBop
-90s|Ricky Martin|Livin' la Vida Loca
-90s|Lou Bega|Mambo No. 5
-90s|Vanilla Ice|Ice Ice Baby
-90s|MC Hammer|U Can't Touch This
-90s|Shania Twain|Man! I Feel Like a Woman!
-90s|Destiny's Child|Say My Name
-90s|blink-182|All the Small Things
-90s|Cher|Believe
-90s|Los del Rio|Macarena
-90s|Natalie Imbruglia|Torn
-90s|Sir Mix-a-Lot|Baby Got Back
-90s|No Doubt|Don't Speak
-90s|Fugees|Killing Me Softly with His Song
-90s|Savage Garden|Truly Madly Deeply
-90s|Semisonic|Closing Time
-90s|Chumbawamba|Tubthumping
-90s|Christina Aguilera|Genie in a Bottle
-90s|Sixpence None the Richer|Kiss Me
-90s|Santana|Smooth
-90s|Bryan Adams|Summer of '69
-2000s|OutKast|Hey Ya!
-2000s|Beyoncé|Crazy in Love
-2000s|Eminem|Lose Yourself
-2000s|The Killers|Mr. Brightside
-2000s|Usher|Yeah!
-2000s|Rihanna|Umbrella
-2000s|Kelly Clarkson|Since U Been Gone
-2000s|Gnarls Barkley|Crazy
-2000s|Coldplay|Clocks
-2000s|Coldplay|Viva la Vida
-2000s|Lady Gaga|Poker Face
-2000s|Lady Gaga|Bad Romance
-2000s|Black Eyed Peas|I Gotta Feeling
-2000s|Nelly|Hot in Herre
-2000s|50 Cent|In da Club
-2000s|Justin Timberlake|SexyBack
-2000s|Avril Lavigne|Complicated
-2000s|Linkin Park|In the End
-2000s|The White Stripes|Seven Nation Army
-2000s|Kanye West|Gold Digger
-2000s|Amy Winehouse|Rehab
-2000s|Shakira|Hips Don't Lie
-2000s|Nelly Furtado|Promiscuous
-2000s|Katy Perry|Hot n Cold
-2000s|Taylor Swift|Love Story
-2000s|Taylor Swift|You Belong with Me
-2000s|Green Day|Boulevard of Broken Dreams
-2000s|Fall Out Boy|Sugar, We're Goin Down
-2000s|My Chemical Romance|Welcome to the Black Parade
-2000s|Daniel Powter|Bad Day
-2000s|Vanessa Carlton|A Thousand Miles
-2000s|Kings of Leon|Use Somebody
-2000s|Flo Rida|Low
-2000s|Train|Hey, Soul Sister
-2000s|Jason Mraz|I'm Yours
-2000s|Leona Lewis|Bleeding Love
-2000s|Maroon 5|This Love
-2000s|Franz Ferdinand|Take Me Out
-2000s|Sean Paul|Get Busy
-2000s|Hoobastank|The Reason
-2000s|Nickelback|How You Remind Me
-2000s|Alicia Keys|Fallin'
-2000s|Britney Spears|Toxic
-2000s|Gwen Stefani|Hollaback Girl
-2000s|MGMT|Kids
-2000s|The Fray|How to Save a Life
-2000s|Snow Patrol|Chasing Cars
-2000s|Kesha|TiK ToK
-2000s|Beyoncé|Single Ladies (Put a Ring on It)
-2000s|Missy Elliott|Get Ur Freak On
-2010s|Adele|Rolling in the Deep
-2010s|Adele|Someone Like You
-2010s|Adele|Hello
-2010s|Pharrell Williams|Happy
-2010s|Mark Ronson|Uptown Funk
-2010s|Bruno Mars|Just the Way You Are
-2010s|Bruno Mars|24K Magic
-2010s|Carly Rae Jepsen|Call Me Maybe
-2010s|Gotye|Somebody That I Used to Know
-2010s|Ed Sheeran|Shape of You
-2010s|Ed Sheeran|Thinking Out Loud
-2010s|Taylor Swift|Shake It Off
-2010s|Taylor Swift|Blank Space
-2010s|Katy Perry|Roar
-2010s|Imagine Dragons|Radioactive
-2010s|Imagine Dragons|Believer
-2010s|Lorde|Royals
-2010s|Avicii|Wake Me Up
-2010s|Daft Punk|Get Lucky
-2010s|LMFAO|Party Rock Anthem
-2010s|Foster the People|Pumped Up Kicks
-2010s|fun.|We Are Young
-2010s|Macklemore & Ryan Lewis|Thrift Shop
-2010s|PSY|Gangnam Style
-2010s|Justin Bieber|Sorry
-2010s|Drake|Hotline Bling
-2010s|Drake|God's Plan
-2010s|The Weeknd|Can't Feel My Face
-2010s|Luis Fonsi|Despacito
-2010s|Billie Eilish|bad guy
-2010s|Lil Nas X|Old Town Road
-2010s|Post Malone|Circles
-2010s|Post Malone|Sunflower
-2010s|Meghan Trainor|All About That Bass
-2010s|Sia|Chandelier
-2010s|OneRepublic|Counting Stars
-2010s|Twenty One Pilots|Stressed Out
-2010s|Hozier|Take Me to Church
-2010s|Ariana Grande|thank u, next
-2010s|Ariana Grande|7 rings
-2010s|Kendrick Lamar|HUMBLE.
-2010s|Portugal. The Man|Feel It Still
-2010s|Lady Gaga|Shallow
-2010s|Rihanna|We Found Love
-2010s|Maroon 5|Moves Like Jagger
-2010s|Passenger|Let Her Go
-2010s|The Chainsmokers|Closer
-2010s|Lizzo|Truth Hurts
-2010s|Dua Lipa|New Rules
-2010s|Childish Gambino|Redbone
-2010s|Shawn Mendes|Stitches
-2010s|Lewis Capaldi|Someone You Loved
-2010s|Panic! At The Disco|High Hopes
-2020s|The Weeknd|Blinding Lights
-2020s|Dua Lipa|Levitating
-2020s|Dua Lipa|Don't Start Now
-2020s|Harry Styles|As It Was
-2020s|Harry Styles|Watermelon Sugar
-2020s|Olivia Rodrigo|drivers license
-2020s|Olivia Rodrigo|good 4 u
-2020s|Doja Cat|Say So
-2020s|Doja Cat|Paint The Town Red
-2020s|Glass Animals|Heat Waves
-2020s|Lil Nas X|MONTERO (Call Me By Your Name)
-2020s|Miley Cyrus|Flowers
-2020s|Taylor Swift|Anti-Hero
-2020s|Taylor Swift|Cruel Summer
-2020s|SZA|Kill Bill
-2020s|Sabrina Carpenter|Espresso
-2020s|Chappell Roan|Good Luck, Babe!
-2020s|Benson Boone|Beautiful Things
-2020s|Billie Eilish|BIRDS OF A FEATHER
-2020s|Kendrick Lamar|Not Like Us
-2020s|Teddy Swims|Lose Control
-2020s|Hozier|Too Sweet
-2020s|Morgan Wallen|Last Night
-2020s|Zach Bryan|Something in the Orange
-2020s|Lady Gaga, Bruno Mars|Die With A Smile
-2020s|Tate McRae|greedy
-2020s|Jack Harlow|First Class
-2020s|Lizzo|About Damn Time
-2020s|Måneskin|Beggin'
-2020s|The Kid LAROI, Justin Bieber|STAY
-2020s|Ed Sheeran|Bad Habits
-2020s|Shaboozey|A Bar Song (Tipsy)
-2020s|ROSÉ, Bruno Mars|APT.
-2020s|Djo|End of Beginning
-2020s|Gracie Abrams|That's So True
-2020s|Noah Kahan|Stick Season
+classic|rock|1|The Beatles|Hey Jude
+classic|rock|1|The Beatles|Let It Be
+classic|rock|1|The Beatles|Here Comes the Sun
+classic|rock|2|The Beatles|Come Together
+classic|rock|2|The Beatles|Twist and Shout
+classic|rock|1|The Rolling Stones|(I Can't Get No) Satisfaction
+classic|rock|2|The Rolling Stones|Paint It Black
+classic|rock|3|The Rolling Stones|Gimme Shelter
+classic|pop|2|The Beach Boys|Good Vibrations
+classic|pop|3|The Beach Boys|Wouldn't It Be Nice
+classic|rnb|1|Aretha Franklin|Respect
+classic|rnb|2|The Temptations|My Girl
+classic|rnb|2|Marvin Gaye|I Heard It Through the Grapevine
+classic|rnb|2|Marvin Gaye, Tammi Terrell|Ain't No Mountain High Enough
+classic|rnb|2|Ben E. King|Stand by Me
+classic|rnb|3|The Supremes|You Can't Hurry Love
+classic|rnb|3|Sam Cooke|A Change Is Gonna Come
+classic|rock|2|Creedence Clearwater Revival|Fortunate Son
+classic|rock|3|Creedence Clearwater Revival|Bad Moon Rising
+classic|rock|3|Creedence Clearwater Revival|Have You Ever Seen the Rain
+classic|pop|3|Simon & Garfunkel|Mrs. Robinson
+classic|pop|3|Simon & Garfunkel|The Sound of Silence
+classic|rock|2|The Animals|The House of the Rising Sun
+classic|rock|2|Van Morrison|Brown Eyed Girl
+classic|rnb|2|Otis Redding|(Sittin' On) The Dock of the Bay
+classic|pop|3|The Monkees|Daydream Believer
+classic|pop|3|The Monkees|I'm a Believer
+classic|rnb|2|The Jackson 5|I Want You Back
+classic|rnb|3|The Jackson 5|ABC
+classic|rock|1|Queen|Bohemian Rhapsody
+classic|rock|1|Queen|Don't Stop Me Now
+classic|rock|2|Queen|We Will Rock You
+classic|pop|1|ABBA|Dancing Queen
+classic|pop|2|ABBA|Mamma Mia
+classic|pop|3|ABBA|Take a Chance on Me
+classic|rock|2|Fleetwood Mac|Dreams
+classic|rock|2|Fleetwood Mac|Go Your Own Way
+classic|rock|3|Fleetwood Mac|The Chain
+classic|rock|2|Eagles|Hotel California
+classic|rock|3|Eagles|Take It Easy
+classic|rock|2|Led Zeppelin|Stairway to Heaven
+classic|rock|3|Led Zeppelin|Immigrant Song
+classic|rock|3|Led Zeppelin|Whole Lotta Love
+classic|pop|2|Elton John|Tiny Dancer
+classic|pop|2|Elton John|Rocket Man
+classic|pop|3|Elton John|Bennie and the Jets
+classic|dance|1|Bee Gees|Stayin' Alive
+classic|dance|3|Bee Gees|You Should Be Dancing
+classic|dance|2|Gloria Gaynor|I Will Survive
+classic|dance|2|Village People|Y.M.C.A.
+classic|dance|3|Donna Summer|Hot Stuff
+classic|dance|3|KC and the Sunshine Band|Get Down Tonight
+classic|dance|3|Chic|Le Freak
+classic|rock|2|Lynyrd Skynyrd|Sweet Home Alabama
+classic|rock|3|Lynyrd Skynyrd|Free Bird
+classic|rnb|2|Stevie Wonder|Superstition
+classic|rnb|3|Stevie Wonder|Sir Duke
+classic|rnb|2|Bill Withers|Lean on Me
+classic|rnb|3|Bill Withers|Ain't No Sunshine
+classic|rnb|1|Earth, Wind & Fire|September
+classic|rock|3|David Bowie|Heroes
+classic|rock|3|David Bowie|Space Oddity
+classic|rock|3|David Bowie|Changes
+classic|rock|2|Boston|More Than a Feeling
+classic|rock|3|Steve Miller Band|The Joker
+classic|pop|2|Billy Joel|Piano Man
+classic|rock|3|Bruce Springsteen|Born to Run
+classic|pop|3|Don McLean|American Pie
+classic|pop|2|John Lennon|Imagine
+classic|rock|3|Kansas|Carry On Wayward Son
+classic|rock|3|Blue Öyster Cult|(Don't Fear) The Reaper
+classic|rock|2|Electric Light Orchestra|Mr. Blue Sky
+classic|rock|2|AC/DC|Highway to Hell
+classic|rock|3|Pink Floyd|Wish You Were Here
+classic|rock|3|Pink Floyd|Another Brick in the Wall, Pt. 2
+classic|rock|3|The Doors|Light My Fire
+classic|pop|1|Neil Diamond|Sweet Caroline
+classic|rock|3|The Who|Baba O'Riley
+classic|rock|3|Jimi Hendrix|All Along the Watchtower
+classic|rock|3|Steppenwolf|Born to Be Wild
+classic|rock|3|The Kinks|You Really Got Me
+classic|rock|3|Cheap Trick|I Want You to Want Me
+classic|rock|3|Thin Lizzy|The Boys Are Back in Town
+classic|rock|3|Tom Petty and the Heartbreakers|American Girl
+classic|pop|3|The Mamas & The Papas|California Dreamin'
+classic|pop|3|Carole King|I Feel the Earth Move
+classic|alt|3|Talking Heads|Psycho Killer
+classic|alt|3|Blondie|Heart of Glass
+classic|alt|3|Ramones|Blitzkrieg Bop
+classic|alt|3|The Clash|London Calling
+classic|hiphop|3|Sugarhill Gang|Rapper's Delight
+classic|country|2|John Denver|Take Me Home, Country Roads
+classic|country|3|Kenny Rogers|The Gambler
+classic|country|2|Dolly Parton|Jolene
+classic|country|3|Johnny Cash|Ring of Fire
+classic|country|3|Glen Campbell|Rhinestone Cowboy
+80s|pop|1|Michael Jackson|Billie Jean
+80s|pop|1|Michael Jackson|Beat It
+80s|pop|1|Michael Jackson|Thriller
+80s|pop|3|Michael Jackson|Smooth Criminal
+80s|pop|2|Prince|Purple Rain
+80s|pop|3|Prince|When Doves Cry
+80s|pop|3|Prince|Kiss
+80s|pop|2|Madonna|Like a Prayer
+80s|pop|3|Madonna|Material Girl
+80s|pop|3|Madonna|Like a Virgin
+80s|pop|1|Whitney Houston|I Wanna Dance with Somebody (Who Loves Me)
+80s|rock|1|Journey|Don't Stop Believin'
+80s|rock|3|Journey|Separate Ways (Worlds Apart)
+80s|rock|1|Bon Jovi|Livin' on a Prayer
+80s|rock|2|Bon Jovi|You Give Love a Bad Name
+80s|pop|1|Toto|Africa
+80s|pop|1|a-ha|Take On Me
+80s|pop|2|Cyndi Lauper|Girls Just Want to Have Fun
+80s|pop|3|Cyndi Lauper|Time After Time
+80s|rock|2|Queen|Another One Bites the Dust
+80s|rock|2|Queen, David Bowie|Under Pressure
+80s|rock|1|Survivor|Eye of the Tiger
+80s|rock|1|Guns N' Roses|Sweet Child O' Mine
+80s|rock|3|Guns N' Roses|Welcome to the Jungle
+80s|rock|2|Def Leppard|Pour Some Sugar On Me
+80s|pop|2|Tears for Fears|Everybody Wants to Rule the World
+80s|pop|3|Tears for Fears|Shout
+80s|pop|2|Wham!|Wake Me Up Before You Go-Go
+80s|pop|1|Rick Astley|Never Gonna Give You Up
+80s|pop|2|Kenny Loggins|Footloose
+80s|rock|3|Kenny Loggins|Danger Zone
+80s|pop|2|Daryl Hall & John Oates|You Make My Dreams
+80s|pop|3|Daryl Hall & John Oates|Maneater
+80s|pop|2|Simple Minds|Don't You (Forget About Me)
+80s|rock|2|The Police|Every Breath You Take
+80s|pop|2|Eurythmics|Sweet Dreams (Are Made of This)
+80s|pop|2|Dexys Midnight Runners|Come On Eileen
+80s|rock|3|Bruce Springsteen|Dancing in the Dark
+80s|rock|3|Bruce Springsteen|Born in the U.S.A.
+80s|rock|2|U2|With or Without You
+80s|rock|3|U2|I Still Haven't Found What I'm Looking For
+80s|rock|1|AC/DC|Back in Black
+80s|rock|3|AC/DC|You Shook Me All Night Long
+80s|rock|2|Van Halen|Jump
+80s|rock|3|Van Halen|Panama
+80s|pop|3|Huey Lewis & The News|The Power of Love
+80s|rock|3|Pat Benatar|Hit Me with Your Best Shot
+80s|rock|2|Joan Jett & The Blackhearts|I Love Rock 'N Roll
+80s|pop|2|Phil Collins|In the Air Tonight
+80s|pop|3|Lionel Richie|All Night Long (All Night)
+80s|rnb|3|Lionel Richie|Hello
+80s|rock|3|Billy Idol|White Wedding
+80s|rock|3|Billy Idol|Rebel Yell
+80s|pop|2|Bonnie Tyler|Total Eclipse of the Heart
+80s|rock|2|Europe|The Final Countdown
+80s|pop|3|Duran Duran|Hungry Like the Wolf
+80s|pop|3|Belinda Carlisle|Heaven Is a Place on Earth
+80s|pop|3|Starship|We Built This City
+80s|pop|2|Billy Joel|Uptown Girl
+80s|pop|3|George Michael|Faith
+80s|pop|2|Men At Work|Down Under
+80s|rock|1|Bryan Adams|Summer of '69
+80s|pop|2|The Bangles|Walk Like an Egyptian
+80s|pop|2|Culture Club|Karma Chameleon
+80s|pop|2|Bobby McFerrin|Don't Worry Be Happy
+80s|pop|3|Pet Shop Boys|West End Girls
+80s|pop|3|Kim Wilde|Kids in America
+80s|pop|3|Billy Ocean|Get Outta My Dreams, Get into My Car
+80s|rock|2|Ozzy Osbourne|Crazy Train
+80s|rock|2|Twisted Sister|We're Not Gonna Take It
+80s|rock|3|Whitesnake|Here I Go Again
+80s|rock|3|Scorpions|Rock You Like a Hurricane
+80s|rock|3|Mötley Crüe|Kickstart My Heart
+80s|rock|3|Poison|Every Rose Has Its Thorn
+80s|rock|3|Foreigner|I Want to Know What Love Is
+80s|rock|3|REO Speedwagon|Keep On Loving You
+80s|hiphop|2|Run-DMC, Aerosmith|Walk This Way
+80s|hiphop|3|Run-DMC|It's Tricky
+80s|hiphop|3|Beastie Boys|(You Gotta) Fight for Your Right (To Party!)
+80s|hiphop|3|Grandmaster Flash & The Furious Five|The Message
+80s|hiphop|3|Salt-N-Pepa|Push It
+80s|hiphop|3|Tone Lōc|Wild Thing
+80s|rnb|3|Janet Jackson|Rhythm Nation
+80s|dance|2|Irene Cara|Flashdance... What a Feeling
+80s|dance|3|Kool & The Gang|Celebration
+80s|dance|3|New Order|Blue Monday
+80s|dance|3|Soft Cell|Tainted Love
+80s|alt|3|The Cure|Just Like Heaven
+80s|alt|3|Talking Heads|Once in a Lifetime
+80s|alt|3|The Smiths|There Is a Light That Never Goes Out
+80s|alt|3|R.E.M.|The One I Love
+80s|alt|3|Depeche Mode|Just Can't Get Enough
+80s|alt|3|Pixies|Where Is My Mind?
+80s|country|3|Dolly Parton|9 to 5
+80s|country|3|Kenny Rogers, Dolly Parton|Islands in the Stream
+80s|country|3|Willie Nelson|On the Road Again
+80s|country|3|Alabama|Mountain Music
+80s|country|3|Hank Williams Jr.|A Country Boy Can Survive
+90s|alt|1|Nirvana|Smells Like Teen Spirit
+90s|alt|3|Nirvana|Come as You Are
+90s|alt|2|Oasis|Wonderwall
+90s|alt|3|Oasis|Don't Look Back in Anger
+90s|pop|1|Backstreet Boys|I Want It That Way
+90s|pop|3|Backstreet Boys|Everybody (Backstreet's Back)
+90s|pop|1|Britney Spears|...Baby One More Time
+90s|pop|1|Spice Girls|Wannabe
+90s|rnb|2|TLC|No Scrubs
+90s|rnb|2|TLC|Waterfalls
+90s|pop|3|Mariah Carey|Fantasy
+90s|pop|3|Mariah Carey|Hero
+90s|pop|1|Whitney Houston|I Will Always Love You
+90s|alt|2|Alanis Morissette|Ironic
+90s|alt|3|Alanis Morissette|You Oughta Know
+90s|alt|2|R.E.M.|Losing My Religion
+90s|rock|2|Red Hot Chili Peppers|Under the Bridge
+90s|rock|3|Red Hot Chili Peppers|Scar Tissue
+90s|hiphop|1|Coolio|Gangsta's Paradise
+90s|hiphop|2|Dr. Dre|Still D.R.E.
+90s|hiphop|3|Dr. Dre|Nuthin' But a "G" Thang
+90s|hiphop|2|The Notorious B.I.G.|Juicy
+90s|hiphop|3|The Notorious B.I.G.|Hypnotize
+90s|hiphop|2|2Pac|California Love
+90s|hiphop|3|2Pac|Changes
+90s|hiphop|2|Will Smith|Gettin' Jiggy Wit It
+90s|hiphop|3|Will Smith|Men in Black
+90s|hiphop|2|Vanilla Ice|Ice Ice Baby
+90s|hiphop|2|MC Hammer|U Can't Touch This
+90s|hiphop|2|Sir Mix-a-Lot|Baby Got Back
+90s|hiphop|3|Warren G|Regulate
+90s|hiphop|3|House of Pain|Jump Around
+90s|hiphop|3|Naughty by Nature|Hip Hop Hooray
+90s|hiphop|3|Snoop Dogg|Gin and Juice
+90s|pop|1|Celine Dion|My Heart Will Go On
+90s|alt|2|Third Eye Blind|Semi-Charmed Life
+90s|alt|2|Goo Goo Dolls|Iris
+90s|rock|3|Matchbox Twenty|3AM
+90s|pop|1|Smash Mouth|All Star
+90s|alt|3|Weezer|Buddy Holly
+90s|alt|2|Green Day|Basket Case
+90s|alt|3|Green Day|Good Riddance (Time of Your Life)
+90s|alt|3|The Verve|Bitter Sweet Symphony
+90s|alt|2|Radiohead|Creep
+90s|rock|3|Pearl Jam|Alive
+90s|pop|2|Hanson|MMMBop
+90s|pop|2|Ricky Martin|Livin' la Vida Loca
+90s|pop|2|Lou Bega|Mambo No. 5
+90s|rnb|2|Destiny's Child|Say My Name
+90s|alt|2|blink-182|All the Small Things
+90s|pop|2|Cher|Believe
+90s|pop|3|Natalie Imbruglia|Torn
+90s|alt|3|No Doubt|Don't Speak
+90s|rnb|3|Fugees|Killing Me Softly with His Song
+90s|pop|3|Savage Garden|Truly Madly Deeply
+90s|alt|3|Semisonic|Closing Time
+90s|alt|3|Chumbawamba|Tubthumping
+90s|pop|2|Christina Aguilera|Genie in a Bottle
+90s|pop|3|Sixpence None the Richer|Kiss Me
+90s|rock|2|Santana|Smooth
+90s|pop|2|Aqua|Barbie Girl
+90s|pop|2|Ace of Base|The Sign
+90s|pop|3|Sugar Ray|Every Morning
+90s|rock|2|Metallica|Enter Sandman
+90s|rock|3|Guns N' Roses|November Rain
+90s|rock|3|Aerosmith|I Don't Want to Miss a Thing
+90s|rock|3|Hootie & the Blowfish|Only Wanna Be with You
+90s|rock|3|Spin Doctors|Two Princes
+90s|rock|3|4 Non Blondes|What's Up?
+90s|alt|3|Deep Blue Something|Breakfast at Tiffany's
+90s|alt|3|Fastball|The Way
+90s|alt|3|New Radicals|You Get What You Give
+90s|alt|3|Harvey Danger|Flagpole Sitta
+90s|alt|3|Len|Steal My Sunshine
+90s|alt|3|Foo Fighters|Everlong
+90s|alt|3|Stone Temple Pilots|Plush
+90s|alt|3|Soundgarden|Black Hole Sun
+90s|alt|3|The Cranberries|Zombie
+90s|alt|3|Counting Crows|Mr. Jones
+90s|alt|3|Everclear|Santa Monica
+90s|rnb|3|Boyz II Men|End of the Road
+90s|rnb|3|Montell Jordan|This Is How We Do It
+90s|rnb|3|Mark Morrison|Return of the Mack
+90s|country|2|Shania Twain|Man! I Feel Like a Woman!
+90s|country|3|Shania Twain|You're Still the One
+90s|country|2|Garth Brooks|Friends in Low Places
+90s|country|3|Brooks & Dunn|Boot Scootin' Boogie
+90s|country|3|Billy Ray Cyrus|Achy Breaky Heart
+90s|country|3|Faith Hill|This Kiss
+90s|country|3|Tim McGraw|I Like It, I Love It
+90s|country|3|Alan Jackson|Chattahoochee
+90s|country|3|LeAnn Rimes|How Do I Live
+90s|country|3|The Chicks|Wide Open Spaces
+90s|dance|2|Los del Rio|Macarena
+90s|dance|2|Haddaway|What Is Love
+90s|dance|2|Darude|Sandstorm
+90s|dance|3|Eiffel 65|Blue (Da Ba Dee)
+90s|dance|3|C+C Music Factory|Gonna Make You Sweat (Everybody Dance Now)
+90s|dance|3|Snap!|Rhythm Is a Dancer
+90s|dance|3|Vengaboys|We Like to Party! (The Vengabus)
+90s|dance|3|Alice Deejay|Better Off Alone
+2000s|hiphop|1|OutKast|Hey Ya!
+2000s|hiphop|3|OutKast|Ms. Jackson
+2000s|rnb|1|Beyoncé|Crazy in Love
+2000s|rnb|1|Beyoncé|Single Ladies (Put a Ring on It)
+2000s|hiphop|1|Eminem|Lose Yourself
+2000s|hiphop|2|Eminem|Without Me
+2000s|hiphop|3|Eminem|The Real Slim Shady
+2000s|alt|1|The Killers|Mr. Brightside
+2000s|alt|3|The Killers|Somebody Told Me
+2000s|rnb|2|Usher|Yeah!
+2000s|pop|1|Rihanna|Umbrella
+2000s|pop|2|Kelly Clarkson|Since U Been Gone
+2000s|rnb|3|Gnarls Barkley|Crazy
+2000s|alt|2|Coldplay|Clocks
+2000s|alt|2|Coldplay|Viva la Vida
+2000s|alt|3|Coldplay|Yellow
+2000s|alt|3|Coldplay|The Scientist
+2000s|pop|1|Lady Gaga|Poker Face
+2000s|pop|2|Lady Gaga|Bad Romance
+2000s|pop|3|Lady Gaga|Just Dance
+2000s|pop|1|Black Eyed Peas|I Gotta Feeling
+2000s|pop|3|Black Eyed Peas|Where Is the Love?
+2000s|hiphop|2|Nelly|Hot in Herre
+2000s|hiphop|2|50 Cent|In da Club
+2000s|pop|2|Justin Timberlake|SexyBack
+2000s|pop|3|Justin Timberlake|Cry Me a River
+2000s|pop|2|Avril Lavigne|Complicated
+2000s|pop|3|Avril Lavigne|Sk8er Boi
+2000s|rock|2|Linkin Park|In the End
+2000s|rock|3|Linkin Park|Numb
+2000s|alt|2|The White Stripes|Seven Nation Army
+2000s|hiphop|2|Kanye West|Gold Digger
+2000s|hiphop|3|Kanye West|Stronger
+2000s|rnb|3|Amy Winehouse|Rehab
+2000s|pop|2|Shakira|Hips Don't Lie
+2000s|pop|3|Nelly Furtado|Promiscuous
+2000s|pop|3|Katy Perry|Hot n Cold
+2000s|pop|3|Katy Perry|I Kissed a Girl
+2000s|country|1|Taylor Swift|Love Story
+2000s|country|2|Taylor Swift|You Belong with Me
+2000s|alt|2|Green Day|Boulevard of Broken Dreams
+2000s|alt|3|Green Day|American Idiot
+2000s|alt|3|Fall Out Boy|Sugar, We're Goin Down
+2000s|alt|3|My Chemical Romance|Welcome to the Black Parade
+2000s|pop|3|Daniel Powter|Bad Day
+2000s|pop|2|Vanessa Carlton|A Thousand Miles
+2000s|rock|3|Kings of Leon|Use Somebody
+2000s|hiphop|3|Flo Rida|Low
+2000s|pop|2|Train|Hey, Soul Sister
+2000s|pop|2|Jason Mraz|I'm Yours
+2000s|pop|3|Leona Lewis|Bleeding Love
+2000s|pop|3|Maroon 5|This Love
+2000s|alt|3|Franz Ferdinand|Take Me Out
+2000s|dance|3|Sean Paul|Get Busy
+2000s|rock|3|Hoobastank|The Reason
+2000s|rock|2|Nickelback|How You Remind Me
+2000s|rnb|3|Alicia Keys|Fallin'
+2000s|rnb|3|Alicia Keys|No One
+2000s|pop|1|Britney Spears|Toxic
+2000s|pop|3|Gwen Stefani|Hollaback Girl
+2000s|alt|3|MGMT|Kids
+2000s|alt|3|The Fray|How to Save a Life
+2000s|alt|3|Snow Patrol|Chasing Cars
+2000s|pop|2|Kesha|TiK ToK
+2000s|hiphop|3|Missy Elliott|Get Ur Freak On
+2000s|hiphop|3|Missy Elliott|Work It
+2000s|pop|2|*NSYNC|Bye Bye Bye
+2000s|pop|3|P!nk|Get the Party Started
+2000s|pop|3|Jesse McCartney|Beautiful Soul
+2000s|pop|3|Natasha Bedingfield|Unwritten
+2000s|pop|3|Michelle Branch|Everywhere
+2000s|pop|3|Hilary Duff|So Yesterday
+2000s|pop|3|The Pussycat Dolls|Don't Cha
+2000s|hiphop|2|Jay-Z, Alicia Keys|Empire State of Mind
+2000s|hiphop|3|Lil Wayne|Lollipop
+2000s|hiphop|3|T.I.|Whatever You Like
+2000s|hiphop|3|Soulja Boy Tell'em|Crank That (Soulja Boy)
+2000s|rnb|3|Ne-Yo|So Sick
+2000s|rnb|3|Mario|Let Me Love You
+2000s|rnb|3|Ciara|Goodies
+2000s|rnb|3|Sean Kingston|Beautiful Girls
+2000s|country|2|Carrie Underwood|Before He Cheats
+2000s|country|3|Rascal Flatts|Life Is a Highway
+2000s|country|3|Big & Rich|Save a Horse (Ride a Cowboy)
+2000s|country|3|Gretchen Wilson|Redneck Woman
+2000s|country|3|Kenny Chesney|No Shoes, No Shirt, No Problems
+2000s|country|3|Keith Urban|Somebody Like You
+2000s|country|2|Lady A|Need You Now
+2000s|dance|2|Daft Punk|One More Time
+2000s|dance|3|Daft Punk|Harder, Better, Faster, Stronger
+2000s|dance|3|Benny Benassi|Satisfaction
+2000s|dance|3|Cascada|Everytime We Touch
+2000s|dance|3|Kylie Minogue|Can't Get You Out of My Head
+2000s|dance|3|Modjo|Lady (Hear Me Tonight)
+2000s|alt|3|Modest Mouse|Float On
+2000s|alt|3|Yeah Yeah Yeahs|Maps
+2000s|alt|3|The Strokes|Last Nite
+2000s|alt|3|Arctic Monkeys|I Bet You Look Good on the Dancefloor
+2000s|alt|3|Panic! At The Disco|I Write Sins Not Tragedies
+2000s|alt|3|Paramore|Misery Business
+2000s|rock|3|Jet|Are You Gonna Be My Girl
+2000s|rock|3|Foo Fighters|Best of You
+2000s|rock|3|Evanescence|Bring Me to Life
+2000s|rock|3|Creed|With Arms Wide Open
+2000s|rock|3|3 Doors Down|Kryptonite
+2010s|pop|1|Adele|Rolling in the Deep
+2010s|pop|1|Adele|Someone Like You
+2010s|pop|1|Adele|Hello
+2010s|pop|1|Pharrell Williams|Happy
+2010s|pop|1|Mark Ronson|Uptown Funk
+2010s|pop|1|Bruno Mars|Just the Way You Are
+2010s|pop|2|Bruno Mars|24K Magic
+2010s|pop|2|Bruno Mars|Locked Out of Heaven
+2010s|pop|1|Carly Rae Jepsen|Call Me Maybe
+2010s|alt|2|Gotye|Somebody That I Used to Know
+2010s|pop|1|Ed Sheeran|Shape of You
+2010s|pop|2|Ed Sheeran|Thinking Out Loud
+2010s|pop|3|Ed Sheeran|Perfect
+2010s|pop|1|Taylor Swift|Shake It Off
+2010s|pop|2|Taylor Swift|Blank Space
+2010s|pop|3|Taylor Swift|We Are Never Ever Getting Back Together
+2010s|pop|2|Katy Perry|Roar
+2010s|pop|2|Katy Perry|Firework
+2010s|pop|3|Katy Perry|Teenage Dream
+2010s|rock|2|Imagine Dragons|Radioactive
+2010s|rock|2|Imagine Dragons|Believer
+2010s|rock|3|Imagine Dragons|Thunder
+2010s|alt|2|Lorde|Royals
+2010s|dance|1|Avicii|Wake Me Up
+2010s|dance|3|Avicii|Levels
+2010s|dance|1|Daft Punk|Get Lucky
+2010s|dance|2|LMFAO|Party Rock Anthem
+2010s|alt|2|Foster the People|Pumped Up Kicks
+2010s|alt|2|fun.|We Are Young
+2010s|hiphop|2|Macklemore & Ryan Lewis|Thrift Shop
+2010s|hiphop|3|Macklemore & Ryan Lewis|Can't Hold Us
+2010s|pop|1|PSY|Gangnam Style
+2010s|pop|2|Justin Bieber|Sorry
+2010s|pop|3|Justin Bieber|Love Yourself
+2010s|hiphop|2|Drake|Hotline Bling
+2010s|hiphop|2|Drake|God's Plan
+2010s|hiphop|3|Drake|One Dance
+2010s|rnb|2|The Weeknd|Can't Feel My Face
+2010s|rnb|3|The Weeknd|Starboy
+2010s|pop|1|Luis Fonsi|Despacito
+2010s|pop|2|Billie Eilish|bad guy
+2010s|country|1|Lil Nas X|Old Town Road
+2010s|hiphop|2|Post Malone|Circles
+2010s|hiphop|2|Post Malone|Sunflower
+2010s|hiphop|3|Post Malone|Congratulations
+2010s|pop|2|Meghan Trainor|All About That Bass
+2010s|pop|2|Sia|Chandelier
+2010s|pop|3|Sia|Cheap Thrills
+2010s|pop|2|OneRepublic|Counting Stars
+2010s|alt|2|Twenty One Pilots|Stressed Out
+2010s|alt|3|Twenty One Pilots|Heathens
+2010s|alt|2|Hozier|Take Me to Church
+2010s|pop|2|Ariana Grande|thank u, next
+2010s|pop|2|Ariana Grande|7 rings
+2010s|pop|3|Ariana Grande|Problem
+2010s|hiphop|2|Kendrick Lamar|HUMBLE.
+2010s|alt|3|Portugal. The Man|Feel It Still
+2010s|pop|2|Lady Gaga|Shallow
+2010s|dance|2|Rihanna|We Found Love
+2010s|pop|3|Rihanna|Diamonds
+2010s|pop|2|Maroon 5|Moves Like Jagger
+2010s|pop|3|Maroon 5|Sugar
+2010s|pop|3|Passenger|Let Her Go
+2010s|dance|2|The Chainsmokers|Closer
+2010s|dance|3|The Chainsmokers|Don't Let Me Down
+2010s|pop|3|Lizzo|Truth Hurts
+2010s|pop|2|Dua Lipa|New Rules
+2010s|rnb|3|Childish Gambino|Redbone
+2010s|pop|3|Shawn Mendes|Stitches
+2010s|pop|2|Lewis Capaldi|Someone You Loved
+2010s|alt|3|Panic! At The Disco|High Hopes
+2010s|pop|2|Justin Timberlake|CAN'T STOP THE FEELING!
+2010s|pop|3|Camila Cabello|Havana
+2010s|pop|3|Halsey|Without Me
+2010s|pop|2|John Legend|All of Me
+2010s|hiphop|3|Travis Scott|SICKO MODE
+2010s|hiphop|3|Cardi B|Bodak Yellow
+2010s|hiphop|2|Wiz Khalifa|See You Again
+2010s|hiphop|2|Nicki Minaj|Super Bass
+2010s|hiphop|3|Iggy Azalea|Fancy
+2010s|rnb|3|Frank Ocean|Thinkin Bout You
+2010s|rnb|3|Khalid|Location
+2010s|country|2|Florida Georgia Line|Cruise
+2010s|country|3|Luke Bryan|Country Girl (Shake It for Me)
+2010s|country|3|Darius Rucker|Wagon Wheel
+2010s|country|2|Chris Stapleton|Tennessee Whiskey
+2010s|country|3|Sam Hunt|Body Like a Back Road
+2010s|country|3|Kacey Musgraves|Follow Your Arrow
+2010s|country|3|Blake Shelton|God's Country
+2010s|country|3|Luke Combs|Beautiful Crazy
+2010s|country|3|Kane Brown|Heaven
+2010s|country|3|Dan + Shay|Tequila
+2010s|dance|2|Calvin Harris|Summer
+2010s|dance|3|Swedish House Mafia|Don't You Worry Child
+2010s|dance|3|Zedd|Clarity
+2010s|dance|3|Major Lazer|Lean On
+2010s|dance|3|Kygo|Firestone
+2010s|dance|3|Marshmello|Happier
+2010s|dance|3|David Guetta|Titanium
+2010s|dance|3|Martin Garrix|Animals
+2010s|alt|3|The Lumineers|Ho Hey
+2010s|alt|3|Mumford & Sons|Little Lion Man
+2010s|alt|3|Of Monsters and Men|Little Talks
+2010s|alt|3|Vance Joy|Riptide
+2010s|alt|3|Walk the Moon|Shut Up and Dance
+2010s|alt|3|Arctic Monkeys|Do I Wanna Know?
+2010s|alt|3|Tame Impala|The Less I Know the Better
+2010s|alt|3|The Neighbourhood|Sweater Weather
+2010s|alt|3|Florence + The Machine|Dog Days Are Over
+2010s|alt|3|Bastille|Pompeii
+2010s|rock|3|The Black Keys|Lonely Boy
+2010s|rock|3|X Ambassadors|Renegades
+2010s|rock|3|Fall Out Boy|Centuries
+2020s|pop|1|The Weeknd|Blinding Lights
+2020s|pop|3|The Weeknd|Save Your Tears
+2020s|pop|1|Dua Lipa|Levitating
+2020s|pop|2|Dua Lipa|Don't Start Now
+2020s|dance|3|Dua Lipa|Houdini
+2020s|pop|1|Harry Styles|As It Was
+2020s|pop|2|Harry Styles|Watermelon Sugar
+2020s|pop|1|Olivia Rodrigo|drivers license
+2020s|pop|2|Olivia Rodrigo|good 4 u
+2020s|pop|3|Olivia Rodrigo|vampire
+2020s|pop|3|Doja Cat|Say So
+2020s|hiphop|3|Doja Cat|Paint The Town Red
+2020s|alt|2|Glass Animals|Heat Waves
+2020s|hiphop|2|Lil Nas X|MONTERO (Call Me By Your Name)
+2020s|hiphop|3|Lil Nas X|INDUSTRY BABY
+2020s|pop|1|Miley Cyrus|Flowers
+2020s|pop|1|Taylor Swift|Anti-Hero
+2020s|pop|2|Taylor Swift|Cruel Summer
+2020s|rnb|2|SZA|Kill Bill
+2020s|pop|1|Sabrina Carpenter|Espresso
+2020s|pop|3|Sabrina Carpenter|Please Please Please
+2020s|pop|2|Chappell Roan|Good Luck, Babe!
+2020s|pop|3|Chappell Roan|HOT TO GO!
+2020s|pop|2|Benson Boone|Beautiful Things
+2020s|pop|2|Billie Eilish|BIRDS OF A FEATHER
+2020s|pop|3|Billie Eilish|What Was I Made For?
+2020s|hiphop|2|Kendrick Lamar|Not Like Us
+2020s|hiphop|3|Kendrick Lamar, SZA|luther
+2020s|hiphop|3|Roddy Ricch|The Box
+2020s|hiphop|3|Megan Thee Stallion|Savage
+2020s|hiphop|3|Jack Harlow|First Class
+2020s|hiphop|3|Tommy Richman|MILLION DOLLAR BABY
+2020s|rnb|3|Teddy Swims|Lose Control
+2020s|rnb|3|Silk Sonic|Leave the Door Open
+2020s|rnb|3|Steve Lacy|Bad Habit
+2020s|alt|3|Hozier|Too Sweet
+2020s|alt|3|Djo|End of Beginning
+2020s|alt|3|Noah Kahan|Stick Season
+2020s|alt|3|Gigi Perez|Sailor Song
+2020s|alt|3|Mitski|My Love Mine All Mine
+2020s|pop|1|Lady Gaga, Bruno Mars|Die With A Smile
+2020s|pop|3|Lady Gaga|Abracadabra
+2020s|pop|3|Tate McRae|greedy
+2020s|pop|3|Lizzo|About Damn Time
+2020s|pop|2|The Kid LAROI, Justin Bieber|STAY
+2020s|pop|3|Ed Sheeran|Bad Habits
+2020s|pop|2|ROSÉ, Bruno Mars|APT.
+2020s|pop|3|Gracie Abrams|That's So True
+2020s|pop|3|Sam Smith|Unholy
+2020s|pop|3|Bad Bunny|Tití Me Preguntó
+2020s|pop|3|Rema|Calm Down
+2020s|pop|3|Myles Smith|Stargazing
+2020s|pop|3|Alex Warren|Ordinary
+2020s|rock|3|Måneskin|Beggin'
+2020s|rock|3|Imagine Dragons|Enemy
+2020s|rock|3|Linkin Park|The Emptiness Machine
+2020s|country|1|Shaboozey|A Bar Song (Tipsy)
+2020s|country|2|Morgan Wallen|Last Night
+2020s|country|3|Zach Bryan|Something in the Orange
+2020s|country|3|Luke Combs|Fast Car
+2020s|country|3|Jelly Roll|Need A Favor
+2020s|country|3|Post Malone, Morgan Wallen|I Had Some Help
+2020s|country|3|Beyoncé|TEXAS HOLD 'EM
+2020s|country|3|Lainey Wilson|Watermelon Moonshine
+2020s|country|3|Bailey Zimmerman|Rock and A Hard Place
+2020s|dance|3|David Guetta, Bebe Rexha|I'm Good (Blue)
+2020s|dance|3|Tiësto|The Business
 `;
 const ERAS = [['classic', '60s & 70s'], ['80s', '80s'], ['90s', '90s'], ['2000s', '2000s'], ['2010s', '2010s'], ['2020s', '2020s']];
-const BUILTIN = SONGS_RAW.trim().split('\n').map(l => { const [era, artist, title] = l.split('|'); return { era, artist, title }; });
+const GENRES = [['pop', 'Pop'], ['rock', 'Rock'], ['alt', 'Alternative'], ['hiphop', 'Hip-Hop'], ['rnb', 'R&B / Soul'], ['country', 'Country'], ['dance', 'Dance']];
+const DIFFS = {
+  easy:   { name: 'Easy',   clips: [2, 4, 7, 11, 16, 25],   maxTier: 1, artistHint: true,  randomStart: false, desc: 'Biggest hits only · clips 2s → 25s · artist hint on' },
+  normal: { name: 'Normal', clips: [1, 2, 4, 7, 11, 16],    maxTier: 2, artistHint: true,  randomStart: false, desc: 'Hits + well-known songs · clips 1s → 16s · artist hint on' },
+  hard:   { name: 'Hard',   clips: [0.5, 1, 2, 4, 7, 11],   maxTier: 3, artistHint: false, randomStart: true,  desc: 'Everything incl. deep cuts · clips 0.5s → 11s · random start point · no artist hint' }
+};
+const BUILTIN = SONGS_RAW.trim().split('\n').map(l => { const [era, genre, tier, artist, title] = l.split('|'); return { era, genre, tier: +tier, artist, title }; });
 
 // ---------- helpers ----------
-const CLIPS = [1, 2, 4, 7, 11, 16];
-const MAXT = CLIPS.length;
+const MAXT = 6;
 const $ = s => document.querySelector(s);
 const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
@@ -412,8 +732,9 @@ function dayNum(k) { const [y, m, d] = k.split('-').map(Number); return Math.flo
 function niceDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
 function fmt(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + pad(s % 60); }
 function setStatus(t) { $('#status').textContent = t; }
-function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1600); }
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1800); }
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function norm(s) {
   return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/ - .*$/, '').replace(/&/g, ' and ')
@@ -423,25 +744,37 @@ function artistParts(a) { return String(a).split(/,| feat\.? | ft\. | x /i).map(
 const songKey = s => norm(s.artist) + '|' + norm(s.title);
 
 // ---------- settings & pool ----------
-let settings = Object.assign({ eras: ERAS.map(e => e[0]), custom: '', useCustom: false, country: 'US', vol: 0.7 }, LS.get('tc:settings', {}));
+let settings = Object.assign({ eras: ERAS.map(e => e[0]), genres: GENRES.map(g => g[0]), diff: 'normal', custom: '', useCustom: false, country: 'US', vol: 0.7 }, LS.get('tc:settings', {}));
+if (!settings.genres) settings.genres = GENRES.map(g => g[0]);
+if (!DIFFS[settings.diff]) settings.diff = 'normal';
 function parseCustom(txt) {
   return txt.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
     const i = l.indexOf(' - '); if (i < 0) return null;
-    return { era: 'custom', artist: l.slice(0, i).trim(), title: l.slice(i + 3).trim() };
+    return { era: 'custom', genre: 'custom', tier: 1, artist: l.slice(0, i).trim(), title: l.slice(i + 3).trim() };
   }).filter(Boolean);
 }
+function customSongs() { return settings.useCustom ? parseCustom(settings.custom) : []; }
+// Pool = songs that can be the ANSWER (filtered by eras, genres, difficulty)
 function getPool() {
-  if (settings.useCustom) { const c = parseCustom(settings.custom); if (c.length) return c; }
-  const p = BUILTIN.filter(s => settings.eras.includes(s.era));
-  return p.length ? p : BUILTIN;
+  const c = customSongs(); if (c.length) return c;
+  const base = BUILTIN.filter(s => settings.eras.includes(s.era) && settings.genres.includes(s.genre));
+  const byDiff = base.filter(s => s.tier <= DIFFS[settings.diff].maxTier);
+  if (byDiff.length >= 5) return byDiff;
+  if (base.length) return base;          // too few songs at this difficulty → use all tiers
+  return BUILTIN;
 }
+// Searchable list = every song (so the search box doesn't give away your filters)
+function allSongs() { const c = customSongs(); return c.length ? c : BUILTIN; }
 let POOL = getPool();
 function shuffledPool() {
   const a = POOL.slice().sort((x, y) => songKey(x) < songKey(y) ? -1 : 1), r = mulberry32(42);
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-function poolSig() { return settings.useCustom && parseCustom(settings.custom).length ? 'c' + parseCustom(settings.custom).length : settings.eras.slice().sort().join(','); }
+function poolSig() {
+  const c = customSongs();
+  return (c.length ? 'c' + c.length : settings.eras.slice().sort().join(',') + '/' + settings.genres.slice().sort().join(',')) + '/' + settings.diff;
+}
 
 // ---------- iTunes (JSONP so it works from a local file) ----------
 let jn = 0;
@@ -475,18 +808,26 @@ let game = null, answer = null, track = null, selected = null;
 const au = $('#au');
 au.volume = settings.vol; $('#vol').value = settings.vol;
 $('#vol').oninput = e => { au.volume = +e.target.value; settings.vol = au.volume; LS.set('tc:settings', settings); };
+$('#diff').value = settings.diff;
+$('#diff').onchange = e => {
+  settings.diff = e.target.value; LS.set('tc:settings', settings); POOL = getPool();
+  toast(`${DIFFS[settings.diff].name}: ${POOL.length} possible songs`);
+  if (game && game.mode === 'unlimited') startUnlimited(true); else startDaily(game ? game.key : dateKey(new Date()));
+};
 
-function save() { LS.set('tc:g:' + game.key, game); }
-function fresh(key, mode, song) { return { key, mode, song, sig: poolSig(), guesses: [], done: false, won: false }; }
+const D = () => DIFFS[game.diff] || DIFFS.normal;
+const storeKey = (key, diff) => 'tc:g:' + key + ':' + diff;
+function save() { LS.set(storeKey(game.key, game.diff), game); }
+function fresh(key, mode, song) { return { key, mode, song, diff: settings.diff, sig: poolSig(), guesses: [], done: false, won: false }; }
+function startOffset() { return D().randomStart && !game.done ? hash(songKey(answer)) % 15 : 0; }
 
 async function startDaily(key) {
   stopAudio();
-  const saved = LS.get('tc:g:' + key, null);
+  const saved = LS.get(storeKey(key, settings.diff), null);
   if (saved && saved.sig === poolSig()) { game = saved; }
   else {
     const list = shuffledPool();
     game = fresh(key, 'daily', null);
-    // find a song with an available preview, starting at today's slot
     setStatus('Finding today\'s song…');
     for (let i = 0; i < 6; i++) {
       const s = list[(dayNum(key) + i * 7) % list.length];
@@ -499,8 +840,8 @@ async function startDaily(key) {
 }
 async function startUnlimited(newOne) {
   stopAudio();
-  let saved = LS.get('tc:g:unl', null);
-  if (!saved || newOne) {
+  let saved = LS.get(storeKey('unl', settings.diff), null);
+  if (!saved || newOne || saved.sig !== poolSig()) {
     setStatus('Picking a song…');
     saved = null;
     for (let i = 0; i < 6 && !saved; i++) {
@@ -521,13 +862,14 @@ async function loadGame() {
   setStatus(''); selected = null; $('#q').value = '';
   render();
 }
-function limit() { return game.done ? 30 : CLIPS[Math.min(game.guesses.length, MAXT - 1)]; }
+function limit() { const c = D().clips; return game.done ? 30 : c[Math.min(game.guesses.length, MAXT - 1)]; }
+function scale() { return game.done ? 30 : D().clips[MAXT - 1]; }
 
 function render() {
-  const today = dateKey(new Date());
+  const today = dateKey(new Date()), c = D().clips;
   $('#modeLbl').innerHTML = game.mode === 'unlimited' ? '<b>Unlimited</b>' : `<b>${game.key === today ? 'Daily' : 'Replay'}</b> · ${niceDate(game.key)}`;
+  $('#diff').value = game.diff;
   $('#count').textContent = Math.min(game.guesses.length + 1, MAXT);
-  // slots
   const box = $('#slots'); box.innerHTML = '';
   for (let i = 0; i < MAXT; i++) {
     const g = game.guesses[i];
@@ -536,18 +878,16 @@ function render() {
     const txt = g ? (g.type === 'skip' ? 'Skipped' : esc(g.label) + (g.type === 'artist' ? ' <small style="color:var(--gold)">· right artist</small>' : '')) : '';
     box.appendChild(el('div', 'slot ' + cls, `<span class="ic">${ic}</span><span>${txt}</span>`));
   }
-  // track bar
-  const L = limit(), scale = game.done ? 30 : 16;
+  const L = limit(), S = scale();
   const tr = $('#track'); tr.querySelectorAll('.tick').forEach(t => t.remove());
-  if (!game.done) CLIPS.slice(0, -1).forEach(c => { const t = el('div', 'tick'); t.style.left = (c / 16 * 100) + '%'; tr.appendChild(t); });
-  $('#unl').style.width = (L / scale * 100) + '%';
+  if (!game.done) c.slice(0, -1).forEach(x => { const t = el('div', 'tick'); t.style.left = (x / S * 100) + '%'; tr.appendChild(t); });
+  $('#unl').style.width = (L / S * 100) + '%';
   $('#prog').style.width = '0';
-  $('#tMax').textContent = fmt(scale);
+  $('#tMax').textContent = fmt(S);
   $('#tNow').textContent = '0:00';
-  // guess area
   $('#guessArea').hidden = game.done;
-  const next = CLIPS[game.guesses.length + 1];
-  $('#skip').textContent = game.guesses.length >= MAXT - 1 ? 'Give up' : `Skip (+${next - CLIPS[game.guesses.length]}s)`;
+  const n = game.guesses.length;
+  $('#skip').textContent = n >= MAXT - 1 ? 'Give up' : `Skip (+${+(c[n + 1] - c[n]).toFixed(1)}s)`;
   renderEnd();
 }
 
@@ -558,7 +898,7 @@ function renderEnd() {
   const n = game.guesses.length;
   box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}">
     ${track.art ? `<img src="${esc(track.art)}" alt="">` : ''}
-    <div><h2>${game.won ? (n === 1 ? 'First second! 🔥' : `Got it on try ${n}!`) : 'Not this time'}</h2>
+    <div><h2>${game.won ? (n === 1 ? 'First try! 🔥' : `Got it on try ${n}!`) : 'Not this time'}</h2>
     <h3>${esc(answer.title)}</h3><p>${esc(answer.artist)}${track.year ? ' · ' + track.year : ''}</p>
     <div class="btns"><button class="primary" id="shareBtn">Copy result</button>
     ${game.mode === 'unlimited' ? '<button id="nextBtn">Next song →</button>' : ''}
@@ -586,7 +926,7 @@ function submit() {
   const label = `${s.artist} — ${s.title}`;
   let type = 'wrong';
   if (songKey(s) === songKey(answer)) type = 'correct';
-  else if (artistParts(s.artist).some(p => artistParts(answer.artist).includes(p))) type = 'artist';
+  else if (D().artistHint && artistParts(s.artist).some(p => artistParts(answer.artist).includes(p))) type = 'artist';
   $('#q').value = ''; selected = null; $('#drop').hidden = true;
   addGuess({ type, label, key: songKey(s) });
 }
@@ -599,12 +939,13 @@ function stopAudio() { au.pause(); playing = false; cancelAnimationFrame(raf); $
 async function playClip() {
   if (!track) return;
   if (playing) { stopAudio(); return; }
-  try { au.currentTime = 0; await au.play(); } catch (e) { toast('Tap ▶ to play'); return; }
+  const off = startOffset();
+  try { au.currentTime = off; await au.play(); } catch (e) { toast('Tap ▶ to play'); return; }
   playing = true; $('#play').textContent = '■';
-  const L = limit(), scale = game.done ? 30 : 16;
+  const L = limit(), S = scale();
   const tick = () => {
-    const t = au.currentTime;
-    $('#prog').style.width = Math.min(100, t / scale * 100) + '%';
+    const t = au.currentTime - off;
+    $('#prog').style.width = Math.min(100, Math.max(0, t) / S * 100) + '%';
     $('#tNow').textContent = fmt(t);
     if (t >= L || au.ended) { stopAudio(); return; }
     raf = requestAnimationFrame(tick);
@@ -613,11 +954,11 @@ async function playClip() {
 }
 $('#play').onclick = playClip;
 
-// ---------- search (local, from the song pool) ----------
+// ---------- search (every song in the list) ----------
 let results = [], sel = 0;
 function matches(v) {
   const toks = norm(v).split(' ').filter(Boolean); if (!toks.length) return [];
-  return POOL.filter(s => { const h = norm(s.title) + ' ' + norm(s.artist); return toks.every(t => h.includes(t)); }).slice(0, 8);
+  return allSongs().filter(s => { const h = norm(s.title) + ' ' + norm(s.artist); return toks.every(t => h.includes(t)); }).slice(0, 8);
 }
 const q = $('#q'), drop = $('#drop');
 q.addEventListener('input', () => { selected = null; results = matches(q.value); sel = 0; renderDrop(); });
@@ -641,28 +982,29 @@ q.addEventListener('blur', () => setTimeout(() => drop.hidden = true, 150));
 function shareText() {
   const sq = { skip: '⬛', wrong: '🟥', artist: '🟨', correct: '🟩' };
   const row = Array.from({ length: MAXT }, (_, i) => game.guesses[i] ? sq[game.guesses[i].type] : '⬜').join('');
-  return `Tune Clue ${game.mode === 'unlimited' ? 'Unlimited' : game.key}\n🔊${row}`;
+  return `Tune Clue ${game.mode === 'unlimited' ? 'Unlimited' : game.key} (${D().name})\n🔊${row}`;
 }
 async function copy(t) {
   try { await navigator.clipboard.writeText(t); }
   catch (e) { const ta = el('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
   toast('Copied!');
 }
-function recordStat() { const s = LS.get('tc:stats', {}); if (!(game.key in s)) { s[game.key] = game.won ? game.guesses.length : 0; LS.set('tc:stats', s); } }
+const statsKey = d => 'tc:stats:' + d;
+function recordStat() { const s = LS.get(statsKey(game.diff), {}); if (!(game.key in s)) { s[game.key] = game.won ? game.guesses.length : 0; LS.set(statsKey(game.diff), s); } }
 function openStats() {
-  const s = LS.get('tc:stats', {}), v = Object.values(s), played = v.length, wins = v.filter(x => x > 0).length;
+  const dk = settings.diff, s = LS.get(statsKey(dk), {}), v = Object.values(s), played = v.length, wins = v.filter(x => x > 0).length;
   let streak = 0; const d = new Date(); if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1);
   while (s[dateKey(d)] > 0) { streak++; d.setDate(d.getDate() - 1); }
   const dist = Array(MAXT).fill(0); v.forEach(x => { if (x > 0) dist[x - 1]++; }); const mx = Math.max(1, ...dist);
-  openModal(`<h2>Stats</h2><div class="stats"><div><b>${played}</b>Played</div><div><b>${played ? Math.round(wins / played * 100) : 0}%</b>Win</div><div><b>${streak}</b>Streak</div></div>
-  <div class="help">Solved on try… (daily games)</div>
-  ${dist.map((c, i) => `<div class="dist"><span style="width:34px">${CLIPS[i]}s</span><span class="b" style="width:${Math.max(6, c / mx * 100)}%">${c}</span></div>`).join('')}`);
+  openModal(`<h2>Stats · ${DIFFS[dk].name}</h2><div class="stats"><div><b>${played}</b>Played</div><div><b>${played ? Math.round(wins / played * 100) : 0}%</b>Win</div><div><b>${streak}</b>Streak</div></div>
+  <div class="help">Solved on try… (daily games, ${DIFFS[dk].name}). Switch difficulty at the top to see other stats.</div>
+  ${dist.map((c, i) => `<div class="dist"><span style="width:38px">${DIFFS[dk].clips[i]}s</span><span class="b" style="width:${Math.max(6, c / mx * 100)}%">${c}</span></div>`).join('')}`);
 }
 function openReplay() {
-  const s = LS.get('tc:stats', {}); let h = '<h2>Replay</h2><div class="help">Play any of the last 50 daily songs.</div><div class="days">';
+  const s = LS.get(statsKey(settings.diff), {}); let h = `<h2>Replay · ${DIFFS[settings.diff].name}</h2><div class="help">Play any of the last 50 daily songs.</div><div class="days">`;
   for (let i = 0; i < 50; i++) {
     const d = new Date(); d.setDate(d.getDate() - i); const k = dateKey(d);
-    const st = k in s ? (s[k] > 0 ? `✓ try ${s[k]}` : '✗') : (LS.get('tc:g:' + k, null)?.guesses?.length ? 'in progress' : '—');
+    const st = k in s ? (s[k] > 0 ? `✓ try ${s[k]}` : '✗') : (LS.get(storeKey(k, settings.diff), null)?.guesses?.length ? 'in progress' : '—');
     h += `<button data-k="${k}">${i === 0 ? 'Today' : niceDate(k)}<small>${st}</small></button>`;
   }
   openModal(h + '</div>');
@@ -670,18 +1012,30 @@ function openReplay() {
 }
 
 // ---------- settings / help ----------
+function checkboxes(kind, list, on) { return `<div class="checks">${list.map(([k, n]) => `<label><input type="checkbox" data-kind="${kind}" value="${k}" ${on.includes(k) ? 'checked' : ''}>${n}</label>`).join('')}</div>`; }
 function openSettings() {
   openModal(`<h2>Settings</h2>
-  <label>Song eras (built-in list, ${BUILTIN.length} songs)</label>
-  <div class="checks">${ERAS.map(([k, n]) => `<label><input type="checkbox" value="${k}" ${settings.eras.includes(k) ? 'checked' : ''}>${n}</label>`).join('')}</div>
+  <label>Decades</label>${checkboxes('era', ERAS, settings.eras)}
+  <label>Genres</label>${checkboxes('genre', GENRES, settings.genres)}
+  <p class="help" id="poolCount"></p>
   <label>Your own song list — one per line as <b>Artist - Title</b></label>
-  <textarea id="sCustom" rows="6" placeholder="Queen - Bohemian Rhapsody&#10;Taylor Swift - Shake It Off">${esc(settings.custom)}</textarea>
-  <div class="checks" style="margin-top:8px"><label><input type="checkbox" id="sUse" ${settings.useCustom ? 'checked' : ''}>Use only my list</label></div>
+  <textarea id="sCustom" rows="5" placeholder="Queen - Bohemian Rhapsody&#10;Taylor Swift - Shake It Off">${esc(settings.custom)}</textarea>
+  <div class="checks" style="margin-top:8px"><label><input type="checkbox" id="sUse" ${settings.useCustom ? 'checked' : ''}>Use only my list (ignores decades, genres &amp; difficulty tiers)</label></div>
   <label>iTunes store country</label><select id="sCountry">${['US', 'CA', 'GB', 'AU', 'IE', 'NZ'].map(c => `<option ${c === settings.country ? 'selected' : ''}>${c}</option>`).join('')}</select>
-  <p class="help">Changing the song list changes which song each day picks. Games already in progress for that list keep their song.</p>
+  <p class="help">Changing these changes which song each day picks.</p>
   <div class="btns" style="margin-top:12px"><button class="primary" id="sSave">Save</button></div>`);
+  const pick = kind => [...document.querySelectorAll(`.checks input[data-kind="${kind}"]`)].filter(c => c.checked).map(c => c.value);
+  const upd = () => {
+    const eras = pick('era'), genres = pick('genre');
+    const n = BUILTIN.filter(s => eras.includes(s.era) && genres.includes(s.genre));
+    const by = d => n.filter(s => s.tier <= DIFFS[d].maxTier).length;
+    $('#poolCount').textContent = `Songs matching: Easy ${by('easy')} · Normal ${by('normal')} · Hard ${by('hard')}`;
+  };
+  document.querySelectorAll('.checks input[data-kind]').forEach(c => c.onchange = upd); upd();
   $('#sSave').onclick = () => {
-    settings.eras = [...document.querySelectorAll('.checks input[value]')].filter(c => c.checked).map(c => c.value);
+    const eras = pick('era'), genres = pick('genre');
+    if (!eras.length || !genres.length) { toast('Pick at least one decade and one genre'); return; }
+    settings.eras = eras; settings.genres = genres;
     settings.custom = $('#sCustom').value; settings.useCustom = $('#sUse').checked; settings.country = $('#sCountry').value;
     LS.set('tc:settings', settings); POOL = getPool(); closeModal();
     toast(`Song pool: ${POOL.length} songs`);
@@ -690,12 +1044,13 @@ function openSettings() {
 }
 function openHelp() {
   openModal(`<h2>How to play</h2><div class="help">
-  <p>Listen to the clip, then guess the song. You get <b>6 tries</b>.</p>
-  <p>The clip starts at 1 second. Each wrong guess or skip unlocks more: 1s → 2s → 4s → 7s → 11s → 16s.</p>
+  <p>Listen to the clip, then guess the song. You get <b>6 tries</b>. Each wrong guess or skip plays more of the song.</p>
   <p>✗ red = wrong · ≈ gold = right artist, wrong song · ✓ green = correct</p>
-  <p>Type to search the song list, pick a match, then Submit (or press Enter twice).</p>
-  <p><b>Daily</b> resets at midnight. <b>Replay</b> plays the last 50 days. <b>Unlimited</b> is random songs anytime. Use ⚙ to pick eras or paste your own songs.</p>
-  <p>Clips are Apple's 30-second previews, so they usually start mid-song rather than at the very beginning.</p></div>`);
+  <table class="diffs"><tr><th>Difficulty</th><th></th></tr>
+  ${Object.values(DIFFS).map(d => `<tr><td><b>${d.name}</b></td><td>${d.desc}</td></tr>`).join('')}</table>
+  <p>Type to search, pick a match, then Submit (or press Enter twice). Search covers every song, not just your filters.</p>
+  <p><b>Daily</b> resets at midnight (one per difficulty). <b>Replay</b> plays the last 50 days. <b>Unlimited</b> is random songs anytime. Use ⚙ to pick decades, genres, or paste your own songs.</p>
+  <p>Clips are Apple's 30-second previews, so they usually start mid-song.</p></div>`);
 }
 function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
 function closeModal() { $('#modal').hidden = true; }
@@ -711,7 +1066,7 @@ $('#bSettings').onclick = openSettings;
 
 // ---------- init ----------
 (function init() {
-  if (!LS.get('tc:seenHelp', false)) { LS.set('tc:seenHelp', true); openHelp(); }
+  if (!LS.get('tc:seenHelp2', false)) { LS.set('tc:seenHelp2', true); openHelp(); }
   startDaily(dateKey(new Date())).catch(e => setStatus(e.message));
 })();
 </script>
