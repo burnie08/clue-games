@@ -100,6 +100,9 @@ nav button.on{background:var(--accent);color:#1a1300}
 .opts{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:16px;text-align:left}
 .optsTitle{font-weight:700;margin-bottom:8px}
 .endbox{background:var(--panel);border-radius:14px;padding:12px 16px;margin-bottom:16px}
+.hlogo.small{font-size:22px;margin:0 0 10px}
+.rcode{font-size:60px;font-weight:800;letter-spacing:12px;color:var(--accent);line-height:1.1}
+#hCode{text-transform:uppercase;letter-spacing:3px}
 /* [hidden] must beat display rules like .grid2 (placed last; !important for real browsers) */
 [hidden]{display:none!important}
 </style>
@@ -140,6 +143,7 @@ nav button.on{background:var(--accent);color:#1a1300}
   <div class="hicon">🏒</div>
   <div class="hlogo">Name<span>ThatTeam</span></div>
   <p class="tag">You're dropped on a street within about 10 miles of an NHL arena. Look around, then pick which of the 32 teams plays there. 5 rounds, 5,000 points for each right answer.</p>
+  <div id="chalBanner"></div>
   <div class="today" id="todayCard"></div>
   <div class="hbtns"><button class="primary" id="hDaily">Play today's 5 teams</button></div>
   <div class="opts">
@@ -148,12 +152,21 @@ nav button.on{background:var(--accent);color:#1a1300}
     <label style="display:flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer"><input type="checkbox" id="hHard" style="width:auto"> <span><b>Hard mode</b> <span class="help">· right outside the arena, facing away, NMPZ, 25 s</span></span></label>
     <button id="hUnl" style="width:100%;margin-top:8px">Play Unlimited</button>
   </div>
+  <div class="opts">
+    <div class="optsTitle">⚔ Play with friends</div>
+    <div class="grid2" id="lOpts"><select id="lMove" title="Live room movement"></select><select id="lTimer" title="Live room round timer"></select></div>
+    <label style="display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer"><input type="checkbox" id="lHard" style="width:auto"> <span><b>Hard mode room</b> <span class="help">· NMPZ, 25 s</span></span></label>
+    <button id="hCreate" class="primary" style="width:100%">Create a live room</button>
+    <div style="display:flex;gap:6px;margin-top:8px"><input id="hCode" placeholder="Room code" maxlength="6" autocomplete="off"><button id="hJoin">Join</button></div>
+    <p class="help" style="margin:8px 0 0">Pick the live room's movement, timer and hard mode above. As host you can still change movement and timer in the lobby (not in a hard room). You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
+  </div>
   <div id="hStatsRow"></div>
   <div class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></div>
   <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
   <a class="back" href="index.html">← All games</a>
 </div></section>
 <section id="endS" class="screen"><div class="hwrap" id="endBody"></div></section>
+<section id="lobby" class="screen"><div class="hwrap" id="lobbyBody"></div></section>
 
 <script>
 // ============================================================
@@ -250,10 +263,13 @@ function hideMsg() { $('#msg').classList.remove('on'); }
 
 // ---------- settings & usage ----------
 // Google key, Street View limit and units are shared with Geo Clue (gc:settings), so they're only entered once.
-// Name That Team's own choices (movement, timer) live in nt:settings.
-const SHARED_KEYS = ['key', 'cap', 'units'], OWN_KEYS = ['move', 'timer', 'hard'];
+// Your name is shared too (challenges and live rooms). Name That Team's own choices (movement, timer, hard, live room) live in nt:settings.
+const SHARED_KEYS = ['key', 'cap', 'units', 'name'], OWN_KEYS = ['move', 'timer', 'hard', 'liveMove', 'liveTimer', 'liveHard'];
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => o && o[k] !== undefined).map(k => [k, o[k]]));
-let settings = Object.assign({ key: '', cap: 4000, units: 'mi', move: 'move', timer: 0, hard: false }, pick(LS.get('gc:settings', {}), SHARED_KEYS), pick(LS.get('nt:settings', {}), OWN_KEYS));
+let settings = Object.assign({ key: '', cap: 4000, units: 'mi', move: 'move', timer: 0, hard: false, liveMove: 'move', liveTimer: 60, liveHard: false },
+  pick(LS.get('gc:settings', {}), SHARED_KEYS), pick(LS.get('nt:settings', {}), OWN_KEYS));
+const LIVE_TIMERS = [0, 30, 60, 90, 120, 180, 300];
+const timerName = t => !t ? 'No timer' : t % 60 ? t + 's' : (t / 60) + ' min';
 // Optional: a key stored in Vercel (GOOGLE_MAPS_KEY) is served by /api/config, so every device works without pasting it.
 let serverKey = '';
 function saveSettings() {
@@ -376,13 +392,13 @@ function scoreTeam(r) { return r.pick && r.pick === r.ans ? 5000 : 0; }
 // ---------- game ----------
 let game = null, timerId = null, chosen = null;
 function save() {
-  const k = game.mode === 'daily' ? 'nt:g:' + game.key : game.mode === 'unl' ? 'nt:g:unl' : null;
+  const k = game.mode === 'daily' ? 'nt:g:' + game.key : game.mode === 'chal' ? 'nt:c:' + game.cid : game.mode === 'unl' ? 'nt:g:unl' : null;
   if (k) LS.set(k, game);
 }
 function modeLabel() {
   if (game.mode === 'daily') return `Daily · ${niceDate(game.key)}`;
-  if (game.hard) return `Hard · NMPZ · ${game.timer}s`;
-  return `${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+  const base = game.hard ? `Hard · NMPZ · ${game.timer}s` : `${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+  return game.mode === 'chal' ? '⚔ Challenge · ' + base : game.mode === 'live' ? 'Live · ' + base : base;
 }
 async function boot() {
   if (!settings.key) { showMsg('Add your Google Maps API key in ⚙ Settings to play.'); openSettings(true); return false; }
@@ -492,6 +508,7 @@ function startTimer() {
   const t = $('#timer');
   if (!game.timer) { t.hidden = true; return; }
   let left = game.timer; t.hidden = false;
+  if (game.mode === 'live' && live && live.data) left = Math.max(1, Math.round(game.timer - (Date.now() + live.skew - live.data.room.startedAt) / 1000));
   const draw = () => { t.textContent = `⏱ ${left}s`; t.classList.toggle('low', left <= 10); };
   draw();
   timerId = setInterval(() => { left--; draw(); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
@@ -503,6 +520,7 @@ function makeGuess(timedOut) {
   if (game.hard && timedOut) chosen = null;   // hard mode: a timeout scores 0 even if a team was highlighted
   r.pick = chosen; r.pts = scoreTeam(r);
   if (!chosen && timedOut) toast('Time\'s up!');
+  if (game.mode === 'live') { game.phase = 'wait'; if (live && live.data) showWaiting(live.data); postLiveGuess(r); return; }
   game.phase = 'result'; save(); showResult();
 }
 function dot(pos, color, label, scale) {
@@ -511,9 +529,10 @@ function dot(pos, color, label, scale) {
 }
 function mapsLink(r) { return `https://www.google.com/maps/@?api=1&map_action=pano&pano=${encodeURIComponent(r.pano)}`; }
 function hidePicker() { $('#picker').hidden = true; $('#pickToggle').hidden = true; }
-function showResult() {
-  const r = game.rounds[game.idx], t = TEAM[r.ans], p = r.pick && TEAM[r.pick], ok = r.pts > 0;
-  hud(); clearInterval(timerId); $('#timer').hidden = true;
+// the reveal: full-screen map with the spot (green) and the right team's arena (gold)
+function revealMap(r) {
+  const t = TEAM[r.ans];
+  clearInterval(timerId); $('#timer').hidden = true;
   $('#block').classList.remove('on');
   hidePicker();
   $('#mapBox').classList.add('on');
@@ -524,6 +543,10 @@ function showResult() {
   // the map was created while hidden: wait until the box is visible, tell Google its size changed, then fit
   const fit = () => { if (G.event) G.event.trigger(map, 'resize'); map.fitBounds(b, 80); };
   if (window.requestAnimationFrame) requestAnimationFrame(fit); else setTimeout(fit, 0);
+}
+function showResult() {
+  const r = game.rounds[game.idx], t = TEAM[r.ans], p = r.pick && TEAM[r.pick], ok = r.pts > 0;
+  hud(); revealMap(r);
   const last = game.idx >= ROUNDS - 1;
   $('#resPanel').innerHTML = `<h2>${ok ? '✅ Correct!' : '❌ Not quite'}</h2>
     <div class="dist">It was the <b>${esc(fullName(t))}</b></div>
@@ -548,15 +571,16 @@ function showFinal() {
     <div class="egrid">${game.rounds.map(r => r.pts > 0 ? '🟩' : '🟥').join('')}</div>
     <div class="endbox"><div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(fullName(TEAM[r.ans]))}</a></span>
       <span>${r.pts > 0 ? '✓' : r.pick ? 'you: ' + esc(TEAM[r.pick].name) : 'no pick'} · <b>${(r.pts || 0).toLocaleString()}</b></span></div>`).join('')}</div></div>
-    ${game.mode === 'daily' ? statsRow() : ''}
-    <div class="hbtns"><button class="primary" id="shareBtn">Copy result</button>${game.mode === 'unl' ? '<button id="againBtn">New game →</button>' : ''}<button id="eHome">⌂ Back to home</button></div>`;
+    ${game.mode === 'daily' ? statsRow() : ''}${game.mode === 'chal' ? `<div class="endbox">${chalBoard()}</div>` : ''}
+    <div class="hbtns"><button class="primary" id="shareBtn">Copy result</button><button id="chalBtn">${game.mode === 'chal' ? '⚔ Send results back' : '⚔ Challenge a friend'}</button>${game.mode === 'unl' ? '<button id="againBtn">New game →</button>' : ''}<button id="eHome">⌂ Back to home</button></div>`;
   $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
   $('#shareBtn').onclick = () => copy(shareText());
+  $('#chalBtn').onclick = shareChallenge;
   if ($('#againBtn')) $('#againBtn').onclick = () => startUnlimited(true);
   $('#eHome').onclick = showHome;
 }
 function shareText() {
-  const label = game.mode === 'daily' ? game.key : game.hard ? 'Hard' : MOVES[game.move];
+  const label = game.mode === 'daily' ? game.key : (game.mode === 'chal' ? 'Challenge · ' : '') + (game.hard ? 'Hard' : MOVES[game.move]);
   return `Name That Team ${label}\n${total().toLocaleString()} / 25,000\n${game.rounds.map(r => r.pts > 0 ? '🟩' : '🟥').join('')}`;
 }
 async function copy(t) {
@@ -597,6 +621,7 @@ function openSettings(first) {
   ${first ? setupSteps() : ''}
   <label>Google Maps API key (shared with Geo Clue)</label><input id="sKey" value="${esc(settings.key === serverKey ? '' : settings.key)}" placeholder="${serverKey ? 'Using the key from your Vercel settings ✓' : 'AIza…'}" autocomplete="off">
   <p class="help" style="margin:4px 0 0">Saves as soon as you paste it.</p>
+  <label>Your name (shown in challenges and live rooms, shared with Geo Clue)</label><input id="sName" maxlength="24" value="${esc(settings.name || '')}" autocomplete="off">
   <label style="display:flex;gap:8px;align-items:center;cursor:pointer;color:var(--text)"><input type="checkbox" id="sHard" style="width:auto" ${settings.hard ? 'checked' : ''}> <span><b>Unlimited: hard mode</b> <span class="help">· right outside the arena, facing away, NMPZ, 25 s. Daily is always normal.</span></span></label>
   <div class="grid2">
     <div id="sMoveBox" ${settings.hard ? 'hidden' : ''}><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
@@ -617,7 +642,7 @@ function openSettings(first) {
     const newKey = readKey();
     if (!newKey) { toast('Enter an API key'); return; }
     const keyChanged = newKey !== keyAtOpen;
-    Object.assign(settings, { key: newKey, move: $('#sMove').value, timer: +$('#sTimer').value, hard: $('#sHard').checked, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
+    Object.assign(settings, { key: newKey, name: $('#sName').value.trim(), move: $('#sMove').value, timer: +$('#sTimer').value, hard: $('#sHard').checked, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
     saveSettings(); closeModal();
     if (keyChanged && G) { location.reload(); return; }
     if (first) startDaily();
@@ -639,6 +664,7 @@ function openHelp() {
   <p>Right team = <b>5,000</b> points, wrong = 0. 5 rounds, 5 different teams per game. Every spot is closer to its own team's arena than to any other, so New York and LA spots are fair.</p>
   <p><b>Daily</b>: same 5 teams for everyone each day, moving allowed, no timer.<br><b>Unlimited</b>: pick a movement rule and timer, or turn on <b>Hard mode</b>: you start within about 300 m of the arena, facing away from it, with no moving, panning or zooming and 25 seconds. A timeout scores 0.</p>
   <p><b>Moving</b> = walk around · <b>No move</b> = look around only · <b>NMPZ</b> = no moving, panning or zooming.</p>
+  <p><b>⚔ Challenge links</b>: finish any game and send the link. Friends play the same 5 spots whenever they like and see the leaderboard.<br><b>🎮 Live rooms</b>: create a room, share the 4-letter code, and everyone plays the same rounds at the same time, with everyone's picks shown after each round. Up to 10 players.</p>
   <p>Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
 }
 function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
@@ -653,7 +679,7 @@ $('#bSettings').onclick = () => openSettings(!settings.key);
 
 // ---------- home screen (Google Maps isn't loaded until you press play) ----------
 function homeOn() { return $('#home').classList.contains('on'); }
-function showHome() { clearInterval(timerId); $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function showHome() { clearInterval(timerId); if (live) leaveRoom(); $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
 function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
 function unlMatches(g) { return g && g.phase !== 'final' && (settings.hard ? g.hard === true : !g.hard && g.move === settings.move && g.timer === +settings.timer); }
 function renderHome() {
@@ -664,11 +690,16 @@ function renderHome() {
   else if (g.phase !== 'final') { status = `<b>In progress · round ${g.idx + 1}/5</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
   else { const t = g.rounds.reduce((a, r) => a + (r.pts || 0), 0); status = `<b>${t.toLocaleString()} / 25,000</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = t >= 25000 ? '🏆' : '✅'; label = "See today's result"; }
   $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  renderBanner();
+  if (pendingRoom && !$('#hCode').value) $('#hCode').value = pendingRoom;
   $('#hDaily').textContent = label;
   const fill = (id, entries, val) => { $(id).innerHTML = entries.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join(''); };
   fill('#hMove', Object.entries(MOVES), settings.move);
   fill('#hTimer', [0, 30, 60, 120, 180].map(t => [t, t ? `⏱ ${t}s` : 'No timer']), settings.timer);
   $('#hHard').checked = !!settings.hard; $('#hOpts').hidden = !!settings.hard;
+  fill('#lMove', Object.entries(MOVES), settings.liveMove);
+  fill('#lTimer', LIVE_TIMERS.map(t => [t, '⏱ ' + timerName(t)]), settings.liveTimer);
+  $('#lHard').checked = !!settings.liveHard; $('#lOpts').hidden = !!settings.liveHard;
   $('#hUnl').textContent = unlMatches(LS.get('nt:g:unl', null)) ? 'Continue Unlimited game' : 'Play Unlimited';
   $('#hStatsRow').innerHTML = statsRow();
   renderMeters();
@@ -683,6 +714,11 @@ function renderMeters() {
   saveSettings(); renderHome();
 });
 $('#hHard').onchange = () => { settings.hard = $('#hHard').checked; saveSettings(); renderHome(); };
+['#lMove', '#lTimer'].forEach(id => $(id).onchange = () => {
+  Object.assign(settings, { liveMove: $('#lMove').value, liveTimer: +$('#lTimer').value });
+  saveSettings();
+});
+$('#lHard').onchange = () => { settings.liveHard = $('#lHard').checked; saveSettings(); renderHome(); };
 const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
 $('#hDaily').onclick = needKey(() => startDaily());
 $('#hUnl').onclick = needKey(() => startUnlimited(false));
@@ -690,7 +726,308 @@ $('#hHow').onclick = openHelp;
 $('#hStats').onclick = openStats;
 $('#hSet').onclick = () => openSettings(!settings.key);
 
+// ============================================================
+// PLAY WITH FRIENDS — challenge links (no setup) + live rooms (same /api/room as Geo Clue)
+// ============================================================
+const COLORS = ['#e4b343', '#4fa3ff', '#ff6b9a', '#7ddc6f', '#c38bff', '#ff8f4f', '#4fe0d2', '#f5f56b', '#ff5c5c', '#a0a0ff'];
+// rooms and links are shared between the games: one made for another game is handed to that game's page
+const GAME_PAGES = { geo: 'geo-clue.html', ntt: 'name-that-team.html', hh: 'hometown-heroes.html' };
+function goPage(url) { location.replace(url); }
+function askName(cb) {
+  if (settings.name) return cb(settings.name);
+  openModal(`<h2>What's your name?</h2><p class="help">Shown to the people you play against.</p>
+    <input id="nmIn" maxlength="24" placeholder="Your name" autocomplete="off">
+    <div class="btns" style="margin-top:12px;justify-content:flex-start"><button class="primary" id="nmOk">Continue</button></div>`);
+  const go = () => { const v = $('#nmIn').value.trim(); if (!v) { toast('Enter a name'); return; } settings.name = v; saveSettings(); closeModal(); cb(v); };
+  $('#nmOk').onclick = go; $('#nmIn').onkeydown = e => { if (e.key === 'Enter') go(); }; $('#nmIn').focus();
+}
+const ruleLabel = (hard, move, timer) => hard ? `Hard · NMPZ · ⏱ ${HARD_TIMER}s` : `${MOVES[move] || 'Moving'}${timer ? ' · ⏱ ' + timerName(timer) : ''}`;
+
+// ---------- challenge links: ?c=<base64url JSON> {v:1, g:'ntt', h:0|1, m, t, r:[[pano, heading, ans]×5], s:[[name,[pts×5]],…]} ----------
+function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return JSON.parse(decodeURIComponent(escape(atob(s)))); }
+let pendingChal = null, pendingRoom = null;
+function readUrl() {
+  const p = new URLSearchParams(location.search);
+  try {
+    const c = p.get('c');
+    if (c) {
+      const ch = b64d(c);
+      if (!ch || !Array.isArray(ch.r) || ch.r.length !== ROUNDS) throw 0;
+      const g = ch.g || 'geo';   // links without a game are Geo Clue links
+      if (g !== 'ntt') { if (!GAME_PAGES[g]) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
+      if (!ch.r.every(x => Array.isArray(x) && TEAM[x[2]])) throw 0;
+      pendingChal = ch;
+    }
+  } catch (e) { toast('That challenge link looks broken'); }
+  const rm = p.get('room'); if (rm) pendingRoom = rm.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+function chalId(ch) { return hash(ch.r.map(x => x[0]).join('|') + ch.h + ch.m + ch.t).toString(36); }
+function myName() { return settings.name || 'You'; }
+function mergedScores() {
+  const prev = (game.chal && game.chal.s) || [];
+  return [...prev.filter(x => x[0] !== myName()), [myName(), game.rounds.map(r => r.pts || 0)]];
+}
+function shareChallenge() {
+  askName(() => {
+    const ch = { v: 1, g: 'ntt', h: game.hard ? 1 : 0, m: game.move, t: game.timer || 0, r: game.rounds.map(r => [r.pano, r.heading, r.ans]), s: mergedScores() };
+    const link = location.origin + location.pathname + '?c=' + b64e(ch);
+    // remember my own run under this challenge, so a link sent back opens straight to the leaderboard
+    if (game.mode !== 'chal') LS.set('nt:c:' + chalId(ch), Object.assign({}, game, { mode: 'chal', key: 'chal', cid: chalId(ch), phase: 'final', chal: { s: [] } }));
+    openModal(`<h2>⚔ ${game.mode === 'chal' ? 'Send your results back' : 'Challenge a friend'}</h2>
+      <p class="help">Send this link by text or email. Whoever opens it plays the same 5 spots and sees ${game.mode === 'chal' ? 'everyone\'s scores so far' : 'your score'}. When they finish they can send their results back the same way.</p>
+      <input id="chLink" readonly value="${esc(link)}">
+      <div class="btns" style="margin-top:12px;justify-content:flex-start"><button class="primary" id="chCopy">Copy link</button></div>`);
+    $('#chCopy').onclick = () => copy(link);
+    $('#chLink').onclick = e => e.target.select();
+  });
+}
+async function startChallenge(ch) {
+  hideHome();
+  const cid = chalId(ch), saved = LS.get('nt:c:' + cid, null);
+  if (capBlocks(saved)) { showCapMsg(); return; }
+  if (!(await boot())) return;
+  if (saved) { game = saved; game.chal = { s: Array.isArray(ch.s) ? ch.s : [] }; save(); return resume(); }
+  showMsg('Loading the challenge…');
+  const rounds = [];
+  try {
+    for (const [panoId, heading, ans] of ch.r) {
+      const { data } = await sv.getPanorama({ pano: panoId });   // metadata lookup: free
+      rounds.push({ pano: panoId, heading: +heading || 0, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(), ans, pick: null, pts: null });
+    }
+  } catch (e) { showMsg('Couldn\'t load one of the challenge spots. The link may be broken or the imagery was removed.'); return; }
+  const hard = ch.h === 1;
+  game = { mode: 'chal', key: 'chal', cid, hard, move: hard ? 'nmpz' : MOVES[ch.m] ? ch.m : 'move', timer: hard ? HARD_TIMER : +ch.t || 0,
+    rounds, idx: 0, phase: 'play', chal: { s: Array.isArray(ch.s) ? ch.s : [] } };
+  save(); resume();
+}
+function chalBoard() {
+  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + x, 0) })).sort((a, b) => b.t - a.t);
+  return `<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">⚔ Challenge leaderboard</div>
+    <div class="rounds">${rows.map((x, i) => `<div><span>${i === 0 ? '🏆' : (i + 1) + '.'} ${esc(x.n)}${x.n === myName() ? ' (you)' : ''}
+      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => v ? '✓' : '✗').join('')}</span></span><b>${x.t.toLocaleString()}</b></div>`).join('')}</div>`;
+}
+function renderBanner() {
+  const b = $('#chalBanner');
+  if (pendingRoom) {
+    b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>🎮 You're invited to live room ${esc(pendingRoom)}</b><div class="d">Everyone plays the same rounds at the same time</div></div>
+      <button class="primary" id="hJoinInv">Join</button></div>`;
+    $('#hJoinInv').onclick = needKey(() => joinRoom(pendingRoom));
+  } else if (pendingChal) {
+    const sc = (pendingChal.s || []).map(([n, p]) => [n, p.reduce((a, x) => a + x, 0)]).sort((a, c) => c[1] - a[1]);
+    const done = LS.get('nt:c:' + chalId(pendingChal), null);
+    b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>⚔ ${sc.length ? esc(sc.map(x => x[0]).join(', ')) + (sc.length === 1 ? ' challenged you' : ' are in this challenge') : 'You have a challenge'}</b>
+      <div class="d">${sc.length ? 'Top score ' + sc[0][1].toLocaleString() + ' · ' : ''}${ruleLabel(pendingChal.h === 1, pendingChal.m, +pendingChal.t)}</div></div>
+      <button class="primary" id="hChal">${done ? (done.phase === 'final' ? 'Results' : 'Continue') : 'Accept'}</button></div>`;
+    $('#hChal').onclick = needKey(() => startChallenge(pendingChal));
+  } else b.innerHTML = '';
+}
+
+// ---------- live rooms: ?room=CODE, polled every 2 s ----------
+let live = null, pollId = null;
+function sessId() {   // per browser tab, survives reloads; lets two tabs be two players
+  try { let id = sessionStorage.getItem('gc:sid'); if (!id) { id = 's' + Math.random().toString(36).slice(2, 10); sessionStorage.setItem('gc:sid', id); } return id; }
+  catch (e) { return 'x' + hash(navigator.userAgent).toString(36); }
+}
+const NODB_MSG = 'Live rooms need a free database. In Vercel open <b>clue-games → Storage → Create Database → Upstash for Redis</b> (free plan), connect it to this project, then redeploy.';
+async function api(action, extra = {}) {
+  const r = await fetch('api/room', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action, code: live && live.code, id: sessId(), name: settings.name }, extra)) });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (r.status === 503 && j.error === 'nodb') throw new Error('NODB');
+  if (r.status === 404 && !j.error) throw new Error('Live rooms need the hosted site (they don\'t work from a file on your computer).');
+  if (!r.ok) throw new Error(j.error || 'Server error ' + r.status);
+  return j;
+}
+function apiError(e) { if (e.message === 'NODB') openModal(`<h2>Live rooms aren't set up yet</h2><p class="help">${NODB_MSG}</p>`); else toast(e.message); }
+function createRoom() {
+  askName(async () => {
+    hideHome();
+    if (overCap()) { showCapMsg(); return; }
+    if (!(await boot())) return;
+    const hard = !!settings.liveHard;
+    showMsg('Finding 5 teams…');
+    let rounds;
+    try { rounds = await makeRounds(mulberry32((Math.random() * 2 ** 32) >>> 0), hard); }
+    catch (e) { showMsg(esc(e.message)); return; }
+    try {
+      live = { code: null };
+      const j = await api('create', { settings: { game: 'ntt', hard, move: hard ? 'nmpz' : settings.liveMove, timer: hard ? HARD_TIMER : +settings.liveTimer },
+        rounds: rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, ans: r.ans })) });
+      enterRoom(j.code);
+    } catch (e) { live = null; showHome(); apiError(e); }
+  });
+}
+// a room made for another game (or an old Geo Clue room): hand over to that game's page (returns true if redirected)
+function otherGame(g, code) {
+  g = g || 'geo';
+  if (g === 'ntt') return false;
+  goPage((GAME_PAGES[g] || GAME_PAGES.geo) + '?room=' + code); return true;
+}
+function joinRoom(code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4) { toast('Enter the 4-letter room code'); return; }
+  askName(async () => {
+    if (overCap()) { hideHome(); showCapMsg(); return; }
+    live = { code };
+    let jr; try { jr = await api('join'); } catch (e) { live = null; apiError(e); return; }
+    if (otherGame(jr && jr.game, code)) return;
+    hideHome();
+    if (!(await boot())) return;
+    enterRoom(code);
+  });
+}
+function enterRoom(code) {
+  live = { code, round: -1, data: null, errs: 0, skew: 0, busy: false, resultSig: '', finalShown: false };
+  pendingRoom = null;
+  try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  hideMsg(); pollRoom();
+  clearInterval(pollId); pollId = setInterval(pollRoom, 2000);
+}
+function leaveRoom() {
+  clearInterval(pollId); pollId = null; live = null;
+  $('#lobby').classList.remove('on');
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+}
+const isHost = () => live && live.data && live.data.room.hostId === sessId();
+function roundOver(d) {
+  const room = d.room, r = room.round, ids = Object.keys(d.players);
+  if (room.forceEnd === r) return true;
+  if (ids.length && ids.every(id => d.guesses[r + ':' + id])) return true;
+  return !!room.settings.timer && d.now - room.startedAt > room.settings.timer * 1000 + 3000;
+}
+function setupLiveGame(room) {
+  const hard = room.settings.hard === true;
+  game = { mode: 'live', key: 'live', code: room.code, hard, move: hard ? 'nmpz' : room.settings.move, timer: hard ? HARD_TIMER : room.settings.timer,
+    rounds: room.rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, ans: r.ans, pick: null, pts: null })), idx: room.round, phase: 'play' };
+  live.round = -1;
+}
+function syncMine(d) {
+  game.rounds.forEach((r, i) => { const g = d.guesses[i + ':' + sessId()]; if (g) { r.pts = g.pts; r.pick = g.pick; } });
+}
+async function pollRoom() {
+  if (!live || live.busy) return;
+  live.busy = true;
+  let d;
+  try { d = await api('get'); live.errs = 0; }
+  catch (e) { if (live && ++live.errs >= 5) { leaveRoom(); showHome(); apiError(e); } return; }
+  finally { if (live) live.busy = false; }
+  if (!live || d.room.code !== live.code) return;
+  live.data = d; live.skew = d.now - Date.now();
+  const room = d.room;
+  if (otherGame(room.settings.game, room.code)) { clearInterval(pollId); return; }
+  if (room.state === 'lobby') return renderLobby(d);
+  $('#lobby').classList.remove('on');
+  if (!game || game.mode !== 'live' || game.code !== room.code) setupLiveGame(room);
+  syncMine(d);
+  if (room.state === 'final') { clearInterval(pollId); return showLiveFinal(d); }
+  const r = room.round;
+  if (live.round !== r) { live.round = r; live.resultSig = ''; game.idx = r; game.phase = d.guesses[r + ':' + sessId()] ? 'wait' : 'play'; showRound(); }
+  if (roundOver(d)) { game.phase = 'result'; showLiveResult(d); }
+  else if (game.phase === 'wait' || d.guesses[r + ':' + sessId()]) { game.phase = 'wait'; showWaiting(d); }
+  else hudLive(d);
+}
+function hudLive(d) {
+  hud();
+  const r = d.room.round, ids = Object.keys(d.players), done = ids.filter(id => d.guesses[r + ':' + id]).length;
+  $('#hMode').innerHTML = `Room <b>${esc(d.room.code)}</b> · ${done}/${ids.length} picked`;
+}
+async function postLiveGuess(r) {
+  try { await api('guess', { round: game.idx, pts: r.pts || 0, km: null, lat: null, lng: null, pick: r.pick || null }); }
+  catch (e) { toast(e.message); }
+  pollRoom();
+}
+function showWaiting(d) {
+  clearInterval(timerId); $('#timer').hidden = true;
+  hudLive(d); hidePicker();
+  const r = d.room.round, ids = Object.keys(d.players), done = ids.filter(id => d.guesses[r + ':' + id]).length;
+  $('#resPanel').innerHTML = `<h2 style="font-size:20px">Pick locked in ✓</h2><div class="dist">Waiting for the others… <b>${done}/${ids.length}</b> picked</div>
+    ${isHost() ? '<div class="btns"><button id="endRoundBtn">End round now</button></div>' : ''}`;
+  $('#resPanel').classList.add('on');
+  if ($('#endRoundBtn')) $('#endRoundBtn').onclick = () => api('endround').then(pollRoom).catch(apiError);
+}
+function playerRows(d, r) {
+  return Object.keys(d.players).map((id, i) => ({ id, name: d.players[id].name, color: COLORS[i % COLORS.length], g: d.guesses[r + ':' + id] || null, me: id === sessId() }));
+}
+function standings(d, upto) {
+  return Object.keys(d.players).map((id, i) => {
+    let tot = 0; const per = [];
+    for (let k = 0; k <= upto; k++) { const p = (d.guesses[k + ':' + id] || {}).pts || 0; tot += p; per.push(p); }
+    return { id, name: d.players[id].name, color: COLORS[i % COLORS.length], tot, per, me: id === sessId() };
+  }).sort((a, b) => b.tot - a.tot);
+}
+function showLiveResult(d) {
+  const room = d.room, r = room.round, sig = r + '|' + Object.keys(d.guesses).length + '|' + Object.keys(d.players).length;
+  if (live.resultSig === sig) return;
+  live.resultSig = sig;
+  const R = game.rounds[r], t = TEAM[R.ans];
+  hudLive(d); revealMap(R);
+  const rows = playerRows(d, r).sort((a, c) => ((c.g || {}).pts || 0) - ((a.g || {}).pts || 0));
+  const pickName = g => g && g.pick && TEAM[g.pick] ? esc(fullName(TEAM[g.pick])) : 'no pick';
+  const last = r >= ROUNDS - 1;
+  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Round ${r + 1} of ${ROUNDS} · Room ${esc(room.code)}</div>
+    <h2>It was the ${esc(fullName(t))}</h2>
+    <div class="where">${esc(t.arena)}, ${esc(t.town)} · <a href="${mapsLink(R)}" target="_blank">open in Google Maps</a></div>
+    <div class="rounds">${rows.map(x => `<div><span><span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}</span><span>${(x.g || {}).pts ? '✅' : '❌'} ${pickName(x.g)} · <b>${((x.g || {}).pts || 0).toLocaleString()}</b></span></div>`).join('')}</div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:2px">Total after round ${r + 1}</div>
+    <div class="rounds">${standings(d, r).map((x, i) => `<div><span>${i + 1}. ${esc(x.name)}${x.me ? ' (you)' : ''}</span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="btns">${isHost() ? `<button class="primary" id="liveNext">${last ? 'Show final results' : 'Next round →'}</button>` : '<span class="help">Waiting for the host to continue…</span>'}</div>`;
+  $('#resPanel').classList.add('on');
+  if ($('#liveNext')) $('#liveNext').onclick = () => { $('#liveNext').disabled = true; api('next').then(pollRoom).catch(apiError); };
+}
+function showLiveFinal(d) {
+  if (live.finalShown) return;
+  live.finalShown = true;
+  game.idx = ROUNDS - 1; game.phase = 'final'; hud(); $('#hMode').innerHTML = `Room <b>${esc(d.room.code)}</b> · final`;
+  clearInterval(timerId); $('#timer').hidden = true;
+  $('#block').classList.remove('on'); $('#resPanel').classList.remove('on'); hidePicker();
+  const st = standings(d, ROUNDS - 1);
+  $('#endBody').innerHTML = `<div class="hicon">🏆</div>
+    <div class="endtitle">${esc(st[0] ? st[0].name : '')} wins!</div>
+    <p class="tag" style="margin:0">Final results · Room ${esc(d.room.code)} · ${modeLabel()}</p>
+    <div class="endbox"><div class="rounds">${st.map((x, i) => `<div><span>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} <span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}
+      <span style="color:var(--muted);font-size:12px"> ${x.per.map(v => v ? '✓' : '✗').join('')}</span></span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div></div>
+    <div class="endbox"><div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(fullName(TEAM[r.ans]))}</a></span>
+      <span>${r.pts > 0 ? '✓' : r.pick && TEAM[r.pick] ? 'you: ' + esc(TEAM[r.pick].name) : 'no pick'}</span></div>`).join('')}</div></div>
+    <div class="hbtns"><button class="primary" id="liveCopy">Copy results</button><button id="liveHome">⌂ Back to home</button></div>`;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
+  $('#liveCopy').onclick = () => copy(`Name That Team live room ${d.room.code}\n` + st.map((x, i) => `${i + 1}. ${x.name} — ${x.tot.toLocaleString()}`).join('\n'));
+  $('#liveHome').onclick = showHome;
+}
+function renderLobby(d) {
+  const room = d.room, ids = Object.keys(d.players), host = room.hostId === sessId(), hard = room.settings.hard === true;
+  const sig = JSON.stringify([ids, ids.map(id => d.players[id].name), room.settings]);
+  if (live.lobbySig === sig && $('#lobby').classList.contains('on')) return;
+  live.lobbySig = sig;
+  const opt = (list, val) => list.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join('');
+  const link = location.origin + location.pathname + '?room=' + room.code;
+  // hard mode is chosen when the room is made (its spots are found then), so the lobby only shows it
+  $('#lobbyBody').innerHTML = `<div class="hicon">🏒</div><div class="hlogo small">Name<span>ThatTeam</span> · Live room</div>
+    <p class="tag" style="margin:0">Room code</p><div class="rcode">${esc(room.code)}</div>
+    <div style="display:flex;gap:6px;margin:10px 0 16px"><input readonly value="${esc(link)}" id="lbLink"><button id="lbCopy">Copy invite</button></div>
+    <div class="today" style="display:block"><b>Players (${ids.length}/10)</b>
+      <div class="rounds" style="margin:8px 0 0">${ids.map((id, i) => `<div><span><span style="color:${COLORS[i % COLORS.length]}">●</span> ${esc(d.players[id].name)}${id === room.hostId ? ' 👑' : ''}${id === sessId() ? ' (you)' : ''}</span></div>`).join('')}</div></div>
+    ${host && !hard ? `<div class="grid2" style="text-align:left;margin:0 0 6px">
+        <div><div class="help">Movement</div><select id="lbMove">${opt(Object.entries(MOVES), room.settings.move)}</select></div>
+        <div><div class="help">Round timer</div><select id="lbTimer">${opt(LIVE_TIMERS.map(t => [t, timerName(t)]), room.settings.timer)}</select></div></div>
+      <p class="help">5 rounds · 5 teams</p>`
+    : `<p class="help">${hard ? '<b>Hard mode</b> · right outside the arena, facing away · NMPZ · ⏱ ' + HARD_TIMER + 's per round' : ruleLabel(false, room.settings.move, room.settings.timer)} · 5 rounds</p>`}
+    <div class="hbtns">${host ? `<button class="primary" id="lbStart">Start game · ${ids.length} player${ids.length > 1 ? 's' : ''}</button>` : '<button disabled>Waiting for the host to start…</button>'}
+      <button id="lbLeave">Leave room</button></div>`;
+  $('#lobby').classList.add('on');
+  $('#lbCopy').onclick = () => copy(link);
+  $('#lbLink').onclick = e => e.target.select();
+  if ($('#lbStart')) $('#lbStart').onclick = () => { $('#lbStart').disabled = true; api('start').then(pollRoom).catch(apiError); };
+  const pushSettings = () => api('settings', { settings: { move: $('#lbMove').value, timer: +$('#lbTimer').value } }).then(pollRoom).catch(apiError);
+  if ($('#lbMove')) { $('#lbMove').onchange = pushSettings; $('#lbTimer').onchange = pushSettings; }
+  $('#lbLeave').onclick = () => { leaveRoom(); showHome(); };
+}
+$('#hCreate').onclick = needKey(createRoom);
+$('#hJoin').onclick = needKey(() => joinRoom($('#hCode').value));
+$('#hCode').onkeydown = e => { if (e.key === 'Enter') $('#hJoin').click(); };
+
 // ---------- init ----------
+readUrl();
 showHome();
 loadServerKey().then(() => { if (homeOn()) renderHome(); });
 </script>
