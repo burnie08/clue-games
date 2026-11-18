@@ -75,7 +75,7 @@ async function geoNoDb(){
 }
 async function world(){
  const {w,d,src}=make('world-clue.html');
- w.eval(src+';window.__t={g:()=>game,guess,search};');
+ w.eval(src+';window.__t={g:()=>game,guess,search,draw:drawShape,by:BY,pool:answerPool,all:COUNTRIES.length};');
  await sleep(50);
  const opened=()=>d.querySelectorAll('.cover.open').length;
  console.log('WORLD start: home on',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| puzzles:',[...d.querySelectorAll('#hPuzzles button')].map(b=>b.textContent+(b.disabled?'(off)':'')).join(' '));
@@ -110,5 +110,19 @@ async function world(){
  d.querySelector('#eShare').click(); await sleep(10); console.log('      share:',JSON.stringify(w.__copied));
  d.querySelector('#eHome').click(); console.log('      home country stats:',d.querySelector('#hStatsRow').textContent.replace(/\s+/g,' ').trim());
  d.querySelector('#hPuzzles button[data-p=flag]').click(); console.log('      back to flag tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '));
+ // ---- Shape puzzle ---- (outline file is a separate script; the fake browser can't fetch it, so load it here)
+ d.querySelector('#hPuzzles button[data-p=shape]').click();
+ console.log('WORLD shape tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| btns:',d.querySelector('#hDaily').textContent,'/',d.querySelector('#hUnl').textContent);
+ d.querySelector('#hDaily').click(); await sleep(50);
+ console.log('      before outlines load:',d.querySelector('#shapebox').textContent,'| script tag added',[...d.querySelectorAll('script')].some(s=>/shapes\.js/.test(s.src)));
+ w.eval(fs.readFileSync(path.join(ROOT,'data/shapes.js'),'utf8')); w.__t.draw();
+ const sa=w.__t.g().answer; const pth=d.querySelector('#shapebox path');
+ console.log('      playing: answer',sa,'area',w.__t.by[sa].area,'| outline chars',pth&&pth.getAttribute('d').length,'| flagbox hidden',d.querySelector('#flagbox').hidden,'| hint:',d.querySelector('#shint').textContent);
+ const sw=['fr','jp','br','au','ca'].filter(c=>c!==sa); for(const c of sw.slice(0,3)) w.__t.guess(c);
+ console.log('      3 misses -> hint:',d.querySelector('#shint').innerHTML.replace(/<\/?b>/g,''),'| rows',d.querySelectorAll('.grow:not(.empty)').length);
+ w.__t.guess(sw[3]); w.__t.guess(sw[4]); console.log('      5 misses -> hint:',d.querySelector('#shint').textContent);
+ w.__t.guess(sa); await sleep(800);
+ console.log('      win in 6 -> end',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'| share:',(d.querySelector('#eShare').click(),await sleep(10),JSON.stringify(w.__copied)));
+ const tiny=w.__t.pool().filter(c=>w.__t.by[c].area<1000); console.log('      shape answer pool',w.__t.pool().length,'of',w.__t.all,'| tiny in pool:',tiny.length);
 }
 (async()=>{await reel();await tune();await geo();await geoNoDb();await world();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
