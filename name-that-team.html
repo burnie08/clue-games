@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Name That Team</title>
+<style>
+:root{--bg:#0f1117;--panel:#181b24;--panel2:#20242f;--text:#e9ecf2;--muted:#8b93a7;--green:#3a9d4f;--gold:#c79a22;--red:#b8423f;--accent:#e4b343}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+body{display:flex;flex-direction:column}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:10px 14px;background:var(--panel2);color:var(--text)}
+button:hover:not(:disabled){filter:brightness(1.25)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:#1a1300;font-weight:700}
+input,select{font:inherit;background:var(--panel2);color:var(--text);border:1px solid #2f3442;border-radius:8px;padding:10px 12px;width:100%}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid #232733;flex-wrap:wrap;flex:none}
+.logo{font-weight:800;font-size:22px;letter-spacing:.5px;cursor:pointer}.logo span{color:var(--accent)}
+nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
+nav button.on{background:var(--accent);color:#1a1300}
+#game{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+#pano{position:absolute;inset:0}
+#block{position:absolute;inset:0;z-index:5;display:none}
+#block.on{display:block}
+#hud{position:absolute;top:10px;left:10px;z-index:6;display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:#000b;border-radius:8px;padding:6px 10px;font-weight:600;font-size:14px}
+.chip small{color:var(--muted);font-weight:400}
+#timer.low{color:#ff6b6b}
+#tools{position:absolute;top:10px;right:10px;z-index:6;display:flex;gap:6px}
+#tools button{background:#000b;padding:8px 10px}
+/* team picker (replaces Geo Clue's map pin) */
+#picker{position:absolute;right:12px;top:54px;bottom:24px;width:340px;z-index:7;display:flex;flex-direction:column;gap:8px;background:#000c;border-radius:12px;padding:10px}
+#picker[hidden],#pickToggle[hidden]{display:none!important}
+#teamFilter{padding:8px 10px}
+#teamPicker{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.div h4{margin:0 0 4px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.tb{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.tb button{padding:6px 8px;font-size:13px;text-align:left;line-height:1.2}
+.tb button.sel{background:var(--accent);color:#1a1300}
+#guessBtn{width:100%}
+#pickToggle{display:none;position:absolute;right:12px;bottom:24px;z-index:7}
+/* the map is only for the reveal */
+#mapBox{position:absolute;inset:0;z-index:7;display:none}
+#mapBox.on{display:block}
+#map{position:absolute;inset:0}
+#resPanel{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:8;background:var(--panel);border-radius:14px;padding:16px 20px;min-width:300px;max-width:92vw;text-align:center;box-shadow:0 10px 40px #000a;display:none}
+#resPanel.on{display:block}
+#resPanel h2{margin:0 0 4px;font-size:26px}
+#resPanel .dist{margin-bottom:6px}
+#resPanel .where{color:var(--muted);font-size:13px;margin-bottom:10px}
+.bar{height:10px;background:#0b0d12;border-radius:5px;overflow:hidden;margin:8px 0 12px}
+.bar div{height:100%;background:var(--accent)}
+.rounds{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:14px;margin:8px 0 12px}
+.rounds div{display:flex;justify-content:space-between;gap:20px}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+#msg{position:absolute;inset:0;z-index:9;display:none;align-items:center;justify-content:center;text-align:center;padding:20px;background:var(--bg)}
+#msg.on{display:flex}
+#msg .inner{max-width:480px;color:var(--muted);line-height:1.5}
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal[hidden]{display:none}
+.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:90vh;overflow:auto;position:relative}
+.mbox h2{margin-top:0}.mbox .close{position:absolute;right:10px;top:10px;background:none;font-size:22px}
+.mbox label{display:block;margin:12px 0 4px;color:var(--muted);font-size:13px}
+.help{color:var(--muted);font-size:13px;line-height:1.55}
+.help ol{padding-left:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stats{display:flex;gap:10px;text-align:center;margin-bottom:16px}
+.stats div{flex:1;background:var(--panel2);border-radius:10px;padding:10px}.stats b{display:block;font-size:22px}
+.usage{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+.usage .bar{margin:6px 0 2px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#toast.show{opacity:1}
+@media (max-width:700px){
+  #picker{display:none;left:0;right:0;top:auto;bottom:0;width:auto;height:65%;border-radius:12px 12px 0 0;background:var(--bg)}
+  #picker.open{display:flex}
+  #pickToggle{display:block}
+  #resPanel{bottom:10px;min-width:0;width:92vw}
+}
+
+/* ---------- home + end screens ---------- */
+.screen{position:fixed;inset:0;z-index:40;background:radial-gradient(circle at 50% 0%,#1f2433 0%,var(--bg) 55%);overflow:auto;display:none;justify-content:center;align-items:flex-start;padding:36px 16px 40px}
+.screen.on{display:flex}
+.hwrap{width:100%;max-width:520px;text-align:center}
+.hicon{font-size:54px;line-height:1}
+.hlogo{font-size:44px;font-weight:800;letter-spacing:.5px;margin:6px 0 8px}.hlogo span{color:var(--accent)}
+.tag{color:var(--muted);line-height:1.5;margin:0 0 20px}
+.today{background:var(--panel);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today b{font-size:16px}.today .d{color:var(--muted);font-size:13px;margin-top:2px}.today .big{font-size:30px}
+.hbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.hbtns button{padding:14px;font-size:17px;border-radius:12px}
+.hmini{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+.hmini button{padding:8px 14px;font-size:14px}
+.hstats{display:flex;gap:8px;margin-bottom:16px}
+.hstats div{flex:1;background:var(--panel);border-radius:10px;padding:8px;font-size:12px;color:var(--muted)}
+.hstats b{display:block;font-size:20px;color:var(--text)}
+.back{color:var(--muted);text-decoration:none;font-size:14px}.back:hover{color:var(--accent)}
+.endtitle{font-size:30px;font-weight:800;margin:0 0 4px}
+.egrid{font-size:20px;line-height:1.25;letter-spacing:2px;margin:12px 0 16px;white-space:pre;overflow-x:auto}
+.opts{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:16px;text-align:left}
+.optsTitle{font-weight:700;margin-bottom:8px}
+.endbox{background:var(--panel);border-radius:14px;padding:12px 16px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Name<span>ThatTeam</span></div>
+  <nav>
+    <button id="bHome">⌂ Home</button>
+    <button id="bStats">Stats</button>
+    <button id="bHelp">?</button>
+    <button id="bSettings">⚙</button>
+  </nav>
+</header>
+<div id="game">
+  <div id="pano"></div>
+  <div id="block"></div>
+  <div id="hud">
+    <div class="chip" id="hRound"></div>
+    <div class="chip" id="hScore"></div>
+    <div class="chip" id="hMode"></div>
+    <div class="chip" id="timer" hidden></div>
+  </div>
+  <div id="tools"><button id="backBtn" title="Return to start">⟲ Start</button></div>
+  <button id="pickToggle" class="primary">🏒 Pick a team</button>
+  <div id="picker" hidden>
+    <input id="teamFilter" placeholder="Type a team or city…" autocomplete="off">
+    <div id="teamPicker"></div>
+    <button id="guessBtn" class="primary" disabled>Pick a team</button>
+  </div>
+  <div id="mapBox"><div id="map"></div></div>
+  <div id="resPanel"></div>
+  <div id="msg"><div class="inner" id="msgInner">Loading…</div></div>
+</div>
+<div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
+<div id="toast"></div>
+<section id="home" class="screen"><div class="hwrap">
+  <div class="hicon">🏒</div>
+  <div class="hlogo">Name<span>ThatTeam</span></div>
+  <p class="tag">You're dropped on a street within about 10 miles of an NHL arena. Look around, then pick which of the 32 teams plays there. 5 rounds, 5,000 points for each right answer.</p>
+  <div class="today" id="todayCard"></div>
+  <div class="hbtns"><button class="primary" id="hDaily">Play today's 5 teams</button></div>
+  <div class="opts">
+    <div class="optsTitle">Unlimited</div>
+    <div class="grid2"><select id="hMove" title="Movement"></select><select id="hTimer" title="Round timer"></select></div>
+    <button id="hUnl" style="width:100%;margin-top:8px">Play Unlimited</button>
+  </div>
+  <div id="hStatsRow"></div>
+  <div class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></div>
+  <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
+  <a class="back" href="index.html">← All games</a>
+</div></section>
+<section id="endS" class="screen"><div class="hwrap" id="endBody"></div></section>
+
+<script>
+// ============================================================
+// TEAMS — the 32 NHL clubs and where their arena is.
+// city + name = the team's full name. town = where the arena actually is.
+// Coordinates: Wikidata (P625) for each arena; Philadelphia and Tampa from their
+// Wikipedia / TheSportsDB entries (see the commit message for the list).
+// ============================================================
+const TEAMS = [
+  // Atlantic
+  { code: 'BOS', city: 'Boston', name: 'Bruins', div: 'Atlantic', arena: 'TD Garden', town: 'Boston, MA', lat: 42.366389, lng: -71.062222 },
+  { code: 'BUF', city: 'Buffalo', name: 'Sabres', div: 'Atlantic', arena: 'KeyBank Center', town: 'Buffalo, NY', lat: 42.875, lng: -78.876389 },
+  { code: 'DET', city: 'Detroit', name: 'Red Wings', div: 'Atlantic', arena: 'Little Caesars Arena', town: 'Detroit, MI', lat: 42.3412, lng: -83.0549 },
+  { code: 'FLA', city: 'Florida', name: 'Panthers', div: 'Atlantic', arena: 'Amerant Bank Arena', town: 'Sunrise, FL', lat: 26.158333, lng: -80.325556 },
+  { code: 'MTL', city: 'Montreal', name: 'Canadiens', div: 'Atlantic', arena: 'Bell Centre', town: 'Montreal, QC', lat: 45.496111, lng: -73.569444 },
+  { code: 'OTT', city: 'Ottawa', name: 'Senators', div: 'Atlantic', arena: 'Canadian Tire Centre', town: 'Ottawa (Kanata), ON', lat: 45.296944, lng: -75.927222 },
+  { code: 'TBL', city: 'Tampa Bay', name: 'Lightning', div: 'Atlantic', arena: 'Benchmark International Arena', town: 'Tampa, FL', lat: 27.9428, lng: -82.4519 },
+  { code: 'TOR', city: 'Toronto', name: 'Maple Leafs', div: 'Atlantic', arena: 'Scotiabank Arena', town: 'Toronto, ON', lat: 43.643333, lng: -79.379167 },
+  // Metropolitan
+  { code: 'CAR', city: 'Carolina', name: 'Hurricanes', div: 'Metropolitan', arena: 'Lenovo Center', town: 'Raleigh, NC', lat: 35.803333, lng: -78.721944 },
+  { code: 'CBJ', city: 'Columbus', name: 'Blue Jackets', div: 'Metropolitan', arena: 'Nationwide Arena', town: 'Columbus, OH', lat: 39.969283, lng: -83.006111 },
+  { code: 'NJD', city: 'New Jersey', name: 'Devils', div: 'Metropolitan', arena: 'Prudential Center', town: 'Newark, NJ', lat: 40.733611, lng: -74.171111 },
+  { code: 'NYI', city: 'New York', name: 'Islanders', div: 'Metropolitan', arena: 'UBS Arena', town: 'Elmont, NY', lat: 40.712094, lng: -73.727157 },
+  { code: 'NYR', city: 'New York', name: 'Rangers', div: 'Metropolitan', arena: 'Madison Square Garden', town: 'New York, NY', lat: 40.750501, lng: -73.993453 },
+  { code: 'PHI', city: 'Philadelphia', name: 'Flyers', div: 'Metropolitan', arena: 'Xfinity Mobile Arena', town: 'Philadelphia, PA', lat: 39.901111, lng: -75.171944 },
+  { code: 'PIT', city: 'Pittsburgh', name: 'Penguins', div: 'Metropolitan', arena: 'PPG Paints Arena', town: 'Pittsburgh, PA', lat: 40.4394, lng: -79.9892 },
+  { code: 'WSH', city: 'Washington', name: 'Capitals', div: 'Metropolitan', arena: 'Capital One Arena', town: 'Washington, DC', lat: 38.898056, lng: -77.020833 },
+  // Central
+  { code: 'CHI', city: 'Chicago', name: 'Blackhawks', div: 'Central', arena: 'United Center', town: 'Chicago, IL', lat: 41.880556, lng: -87.674167 },
+  { code: 'COL', city: 'Colorado', name: 'Avalanche', div: 'Central', arena: 'Ball Arena', town: 'Denver, CO', lat: 39.748611, lng: -105.0075 },
+  { code: 'DAL', city: 'Dallas', name: 'Stars', div: 'Central', arena: 'American Airlines Center', town: 'Dallas, TX', lat: 32.790556, lng: -96.810278 },
+  { code: 'MIN', city: 'Minnesota', name: 'Wild', div: 'Central', arena: 'Grand Casino Arena', town: 'Saint Paul, MN', lat: 44.944722, lng: -93.101111 },
+  { code: 'NSH', city: 'Nashville', name: 'Predators', div: 'Central', arena: 'Bridgestone Arena', town: 'Nashville, TN', lat: 36.159167, lng: -86.778611 },
+  { code: 'STL', city: 'St. Louis', name: 'Blues', div: 'Central', arena: 'Enterprise Center', town: 'St. Louis, MO', lat: 38.626667, lng: -90.2025 },
+  { code: 'UTA', city: 'Utah', name: 'Mammoth', div: 'Central', arena: 'Delta Center', town: 'Salt Lake City, UT', lat: 40.768333, lng: -111.901111 },
+  { code: 'WPG', city: 'Winnipeg', name: 'Jets', div: 'Central', arena: 'Canada Life Centre', town: 'Winnipeg, MB', lat: 49.892778, lng: -97.143611 },
+  // Pacific
+  { code: 'ANA', city: 'Anaheim', name: 'Ducks', div: 'Pacific', arena: 'Honda Center', town: 'Anaheim, CA', lat: 33.807778, lng: -117.876667 },
+  { code: 'CGY', city: 'Calgary', name: 'Flames', div: 'Pacific', arena: 'Scotiabank Saddledome', town: 'Calgary, AB', lat: 51.0375, lng: -114.051944 },
+  { code: 'EDM', city: 'Edmonton', name: 'Oilers', div: 'Pacific', arena: 'Rogers Place', town: 'Edmonton, AB', lat: 53.546944, lng: -113.497778 },
+  { code: 'LAK', city: 'Los Angeles', name: 'Kings', div: 'Pacific', arena: 'Crypto.com Arena', town: 'Los Angeles, CA', lat: 34.043056, lng: -118.267222 },
+  { code: 'SJS', city: 'San Jose', name: 'Sharks', div: 'Pacific', arena: 'SAP Center', town: 'San Jose, CA', lat: 37.332778, lng: -121.901111 },
+  { code: 'SEA', city: 'Seattle', name: 'Kraken', div: 'Pacific', arena: 'Climate Pledge Arena', town: 'Seattle, WA', lat: 47.622222, lng: -122.354167 },
+  { code: 'VAN', city: 'Vancouver', name: 'Canucks', div: 'Pacific', arena: 'Rogers Arena', town: 'Vancouver, BC', lat: 49.277778, lng: -123.108889 },
+  { code: 'VGK', city: 'Vegas', name: 'Golden Knights', div: 'Pacific', arena: 'T-Mobile Arena', town: 'Paradise, NV', lat: 36.102917, lng: -115.178361 }
+];
+const TEAM = Object.fromEntries(TEAMS.map(t => [t.code, t]));
+const DIVS = ['Atlantic', 'Metropolitan', 'Central', 'Pacific'];
+const fullName = t => t.city + ' ' + t.name;
+const MOVES = { move: 'Moving', nomove: 'No move', nmpz: 'NMPZ' };
+const ROUNDS = 5;
+const SPOT_KM = 16;   // ~10 miles around the arena
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const pad = n => String(n).padStart(2, '0');
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function monthKey() { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+function niceDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1800); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function shuffle(list, rng) { const a = list.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function distKm(a, b) {
+  const r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+// the point `km` away from p in compass direction `deg`
+function offsetPoint(p, km, deg) {
+  const r = Math.PI / 180, d = km / 6371, b = deg * r, la = p.lat * r, lo = p.lng * r;
+  const la2 = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b));
+  const lo2 = lo + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(la2));
+  return { lat: la2 / r, lng: lo2 / r };
+}
+function fmtDist(km) {
+  if (settings.units === 'mi') { const mi = km * 0.621371; return mi < 0.2 ? Math.round(mi * 5280) + ' ft' : mi.toFixed(1) + ' mi'; }
+  return km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km';
+}
+function showMsg(html) { $('#msgInner').innerHTML = html; $('#msg').classList.add('on'); }
+function hideMsg() { $('#msg').classList.remove('on'); }
+
+// ---------- settings & usage ----------
+// Google key, Street View limit and units are shared with Geo Clue (gc:settings), so they're only entered once.
+// Name That Team's own choices (movement, timer) live in nt:settings.
+const SHARED_KEYS = ['key', 'cap', 'units'], OWN_KEYS = ['move', 'timer'];
+const pick = (o, keys) => Object.fromEntries(keys.filter(k => o && o[k] !== undefined).map(k => [k, o[k]]));
+let settings = Object.assign({ key: '', cap: 4000, units: 'mi', move: 'move', timer: 0 }, pick(LS.get('gc:settings', {}), SHARED_KEYS), pick(LS.get('nt:settings', {}), OWN_KEYS));
+// Optional: a key stored in Vercel (GOOGLE_MAPS_KEY) is served by /api/config, so every device works without pasting it.
+let serverKey = '';
+function saveSettings() {
+  const s = pick(settings, SHARED_KEYS); if (serverKey && s.key === serverKey) s.key = '';
+  LS.set('gc:settings', Object.assign(LS.get('gc:settings', {}), s));
+  LS.set('nt:settings', pick(settings, OWN_KEYS));
+}
+async function loadServerKey() {
+  try {
+    const r = await fetch('api/config', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.googleMapsKey) { serverKey = j.googleMapsKey; if (!settings.key) settings.key = serverKey; }
+  } catch (e) { /* no server config — fine */ }
+}
+// Same counters as Geo Clue: this device's count (gc:usage) + the shared count for everyone (/api/usage).
+function usage() { const u = LS.get('gc:usage', null); return u && u.month === monthKey() ? u : { month: monthKey(), panos: 0, maps: 0 }; }
+function bump(kind) { const u = usage(); u[kind]++; LS.set('gc:usage', u); if (kind === 'panos') bumpShared(); }
+const FREE_PANOS = 5000;
+let shared = null;
+async function usageCall(opts) {
+  try {
+    const r = await fetch('api/usage', Object.assign({ cache: 'no-store' }, opts));
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && typeof j.panos === 'number') shared = { month: j.month, panos: j.panos };
+  } catch (e) { /* no server or database down — fall back to this device's count */ }
+}
+const loadShared = () => usageCall();
+function bumpShared() {
+  if (shared) shared.panos++;
+  usageCall({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'bump' }) });
+}
+function usedPanos() { return shared ? shared.panos : usage().panos; }
+function overCap() { return usedPanos() >= settings.cap; }
+function meterHTML() {
+  const used = usedPanos(), left = Math.max(0, FREE_PANOS - used), pct = Math.min(100, used / FREE_PANOS * 100);
+  const col = pct >= 80 ? 'var(--red)' : pct >= 60 ? 'var(--gold)' : 'var(--green)';
+  const now = new Date(), days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), day = now.getDate();
+  const mon = d => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const reset = mon(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  let runway;
+  if (!left) runway = 'Free amount used up for this month.';
+  else if (used / day * days <= FREE_PANOS) runway = 'At this pace it lasts the month.';
+  else runway = `At this pace it runs out around ${mon(new Date(now.getFullYear(), now.getMonth(), Math.max(day, Math.floor(FREE_PANOS / (used / day)))))}.`;
+  return `<div class="meter"><b>${used.toLocaleString()}</b> of ${FREE_PANOS.toLocaleString()} free Street View loads used · <b>${left.toLocaleString()}</b> left · resets ${reset}${shared ? '' : ' <span class="help">(this device only)</span>'}
+    <div class="bar"><div style="width:${pct}%;background:${col}"></div></div>
+    <span class="help">${runway} Shared with Geo Clue. The game stops at your limit of ${settings.cap.toLocaleString()}.</span></div>`;
+}
+
+// ---------- Google Maps loading (only when a game starts) ----------
+let G = null, map = null, pano = null, sv = null, resultLayers = [];
+function loadGoogle() {
+  if (G) return Promise.resolve();
+  return new Promise((res, rej) => {
+    window.gm_authFailure = () => showMsg('Google rejected the API key.<br><br>Check that the <b>Maps JavaScript API</b> is enabled, billing is set up, and the key allows this website. Then fix the key in ⚙ Settings.');
+    window.__gcReady = async () => {
+      try {
+        const libs = await Promise.all(['core', 'maps', 'streetView', 'marker'].map(l => google.maps.importLibrary(l)));
+        G = Object.assign({}, ...libs);
+        res();
+      } catch (e) { rej(e); }
+    };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(settings.key)}&v=weekly&loading=async&callback=__gcReady`;
+    s.async = true;
+    s.onerror = () => rej(new Error('Could not load Google Maps. Check your connection.'));
+    document.head.appendChild(s);
+  });
+}
+function initMap() {
+  if (map) return;
+  map = new G.Map($('#map'), { center: { lat: 45, lng: -95 }, zoom: 3, disableDefaultUI: true, zoomControl: true, clickableIcons: false, gestureHandling: 'greedy' });
+  bump('maps');
+  sv = new G.StreetViewService();
+}
+
+// ---------- finding spots (metadata lookups are free) ----------
+function nearestTeam(p) {
+  let best = null, bestKm = Infinity;
+  for (const t of TEAMS) { const km = distKm(p, t); if (km < bestKm) { bestKm = km; best = t.code; } }
+  return best;
+}
+// A random Google-owned pano within ~10 miles of the team's arena, and closer to it than to any other
+// team's arena (so New York / New Jersey and LA / Anaheim spots are never a coin flip).
+// `hard` is accepted for the coming hard mode; every spot is a normal one for now.
+async function findTeamSpot(rng, team, hard) {
+  if (typeof team === 'string') team = TEAM[team];
+  for (let i = 0; i < 30; i++) {
+    const location = offsetPoint(team, SPOT_KM * Math.sqrt(rng()), rng() * 360);
+    try {
+      const { data } = await sv.getPanorama({ location, radius: 2000, preference: 'nearest', sources: [G.StreetViewSource.GOOGLE] });
+      const loc = data && data.location;
+      if (!loc || !loc.pano) continue;
+      const spot = { lat: loc.latLng.lat(), lng: loc.latLng.lng() };
+      if (nearestTeam(spot) !== team.code || distKm(spot, team) > SPOT_KM + 0.1) continue;   // unfair or too far: try again
+      return { pano: loc.pano, lat: spot.lat, lng: spot.lng, heading: Math.round(rng() * 360), ans: team.code, pick: null, pts: null };
+    } catch (e) { /* no coverage near this point — try another */ }
+  }
+  throw new Error(`Could not find Street View near ${team.arena}. Try again.`);
+}
+// 5 different teams, then one spot for each
+async function makeRounds(rng, hard) {
+  const rounds = [];
+  for (const t of shuffle(TEAMS, rng).slice(0, ROUNDS)) rounds.push(await findTeamSpot(rng, t, hard));
+  return rounds;
+}
+function scoreTeam(r) { return r.pick && r.pick === r.ans ? 5000 : 0; }
+
+// ---------- game ----------
+let game = null, timerId = null, chosen = null;
+function save() {
+  const k = game.mode === 'daily' ? 'nt:g:' + game.key : game.mode === 'unl' ? 'nt:g:unl' : null;
+  if (k) LS.set(k, game);
+}
+function modeLabel() {
+  if (game.mode === 'daily') return `Daily · ${niceDate(game.key)}`;
+  return `${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+}
+async function boot() {
+  if (!settings.key) { showMsg('Add your Google Maps API key in ⚙ Settings to play.'); openSettings(true); return false; }
+  if (G) return true;
+  showMsg('Loading Google Maps…');
+  try { await loadGoogle(); initMap(); return true; }
+  catch (e) { showMsg(esc(e.message)); return false; }
+}
+async function startDaily() {
+  hideHome();
+  if (!(await boot())) return;
+  const key = dateKey(new Date());
+  const saved = LS.get('nt:g:' + key, null);
+  if (saved) { game = saved; return resume(); }
+  showMsg('Finding today\'s 5 teams…');
+  let rounds;
+  try { rounds = await makeRounds(mulberry32(hash('ntt-' + key)), false); }   // Daily is always normal mode
+  catch (e) { showMsg(esc(e.message)); return; }
+  game = { mode: 'daily', key, move: 'move', timer: 0, rounds, idx: 0, phase: 'play' };
+  save(); resume();
+}
+async function startUnlimited(fresh) {
+  hideHome();
+  if (!(await boot())) return;
+  const saved = LS.get('nt:g:unl', null);
+  if (!fresh && unlMatches(saved)) { game = saved; return resume(); }
+  showMsg('Finding 5 teams…');
+  let rounds;
+  try { rounds = await makeRounds(mulberry32((Math.random() * 2 ** 32) >>> 0), false); }
+  catch (e) { showMsg(esc(e.message)); return; }
+  game = { mode: 'unl', key: 'unl', move: settings.move, timer: +settings.timer, rounds, idx: 0, phase: 'play' };
+  save(); resume();
+}
+function resume() {
+  hideMsg();
+  if (game.phase === 'play') showRound();
+  else if (game.phase === 'result') showResult();
+  else showFinal();
+}
+function total() { return game.rounds.reduce((a, r) => a + (r.pts || 0), 0); }
+function hud() {
+  $('#hRound').innerHTML = `Round <b>${Math.min(game.idx + 1, ROUNDS)}</b><small>/${ROUNDS}</small>`;
+  $('#hScore').innerHTML = `${total().toLocaleString()} <small>pts</small>`;
+  $('#hMode').innerHTML = modeLabel();
+}
+function clearResultLayers() { resultLayers.forEach(l => l.setMap(null)); resultLayers = []; }
+
+// ---------- team picker ----------
+$('#teamPicker').innerHTML = DIVS.map(dv => `<div class="div"><h4>${dv}</h4><div class="tb">${TEAMS.filter(t => t.div === dv)
+  .sort((a, b) => fullName(a).localeCompare(fullName(b)))
+  .map(t => `<button data-team="${t.code}">${esc(t.city)} <b>${esc(t.name)}</b></button>`).join('')}</div></div>`).join('');
+function selectTeam(code) {
+  chosen = code;
+  document.querySelectorAll('#teamPicker button[data-team]').forEach(b => b.classList.toggle('sel', b.dataset.team === code));
+  $('#guessBtn').disabled = !code;
+  $('#guessBtn').textContent = code ? `Guess: ${fullName(TEAM[code])}` : 'Pick a team';
+}
+function applyFilter() {
+  const q = $('#teamFilter').value.trim().toLowerCase();
+  document.querySelectorAll('#teamPicker button[data-team]').forEach(b => {
+    const t = TEAM[b.dataset.team];
+    b.hidden = !!q && !`${t.city} ${t.name} ${t.code}`.toLowerCase().includes(q);
+  });
+  document.querySelectorAll('#teamPicker .div').forEach(g => { g.hidden = !g.querySelector('button[data-team]:not([hidden])'); });
+}
+$('#teamPicker').onclick = e => {
+  const b = e.target.closest('button[data-team]');
+  if (b && game && game.phase === 'play') selectTeam(b.dataset.team);
+};
+$('#teamFilter').oninput = applyFilter;
+$('#teamFilter').onkeydown = e => {   // Enter with one team left picks it; Enter again guesses
+  if (e.key !== 'Enter') return;
+  const vis = [...document.querySelectorAll('#teamPicker button[data-team]:not([hidden])')];
+  if (vis.length === 1 && chosen !== vis[0].dataset.team) selectTeam(vis[0].dataset.team);
+  else if (chosen) makeGuess(false);
+};
+
+function showRound() {
+  if (overCap()) { showMsg(`${shared ? 'Everyone has' : 'You\'ve'} used <b>${usedPanos().toLocaleString()}</b> Street View loads this month, which hits your limit of ${settings.cap.toLocaleString()}.<br><br>Google gives 5,000 free per month. You can raise the limit in ⚙ Settings, or wait for next month.`); return; }
+  const r = game.rounds[game.idx];
+  hud(); clearResultLayers();
+  $('#resPanel').classList.remove('on');
+  $('#mapBox').classList.remove('on');
+  $('#picker').hidden = false; $('#picker').classList.remove('open'); $('#pickToggle').hidden = false;
+  $('#teamFilter').value = ''; applyFilter(); selectTeam(null);
+  const nm = game.move !== 'move', nmpz = game.move === 'nmpz';
+  const opts = { pano: r.pano, pov: { heading: r.heading, pitch: 0 }, zoom: 0, visible: true,
+    addressControl: false, showRoadLabels: false, fullscreenControl: false, motionTracking: false, motionTrackingControl: false, enableCloseButton: false,
+    linksControl: !nm, clickToGo: !nm, scrollwheel: !nmpz, zoomControl: !nmpz, panControl: true };
+  if (!pano) {
+    pano = new G.StreetViewPanorama($('#pano'), opts);
+    pano.addListener('pano_changed', () => { if (game && game.phase === 'play' && game.move !== 'move' && pano.getPano() !== game.rounds[game.idx].pano) pano.setPano(game.rounds[game.idx].pano); });
+  } else { pano.setOptions(opts); }
+  bump('panos');
+  $('#block').classList.toggle('on', nmpz);
+  $('#backBtn').hidden = nmpz;
+  startTimer();
+}
+function startTimer() {
+  clearInterval(timerId);
+  const t = $('#timer');
+  if (!game.timer) { t.hidden = true; return; }
+  let left = game.timer; t.hidden = false;
+  const draw = () => { t.textContent = `⏱ ${left}s`; t.classList.toggle('low', left <= 10); };
+  draw();
+  timerId = setInterval(() => { left--; draw(); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
+}
+function makeGuess(timedOut) {
+  if (!game || game.phase !== 'play') return;
+  clearInterval(timerId);
+  const r = game.rounds[game.idx];
+  r.pick = chosen; r.pts = scoreTeam(r);
+  if (!chosen && timedOut) toast('Time\'s up!');
+  game.phase = 'result'; save(); showResult();
+}
+function dot(pos, color, label, scale) {
+  return new G.Marker({ map, position: pos, label: label ? { text: label, color: '#111', fontWeight: '700', fontSize: '10px' } : undefined,
+    icon: { path: G.SymbolPath.CIRCLE, scale, fillColor: color, fillOpacity: 1, strokeColor: '#000', strokeWeight: 1.5 } });
+}
+function mapsLink(r) { return `https://www.google.com/maps/@?api=1&map_action=pano&pano=${encodeURIComponent(r.pano)}`; }
+function hidePicker() { $('#picker').hidden = true; $('#pickToggle').hidden = true; }
+function showResult() {
+  const r = game.rounds[game.idx], t = TEAM[r.ans], p = r.pick && TEAM[r.pick], ok = r.pts > 0;
+  hud(); clearInterval(timerId); $('#timer').hidden = true;
+  $('#block').classList.remove('on');
+  hidePicker();
+  $('#mapBox').classList.add('on');
+  clearResultLayers();
+  const b = new G.LatLngBounds();
+  resultLayers.push(dot({ lat: r.lat, lng: r.lng }, '#3a9d4f', '', 9), dot({ lat: t.lat, lng: t.lng }, '#e4b343', t.code, 14));
+  resultLayers.forEach(m => b.extend(m.getPosition()));
+  map.fitBounds(b, 80);
+  const last = game.idx >= ROUNDS - 1;
+  $('#resPanel').innerHTML = `<h2>${ok ? '✅ Correct!' : '❌ Not quite'}</h2>
+    <div class="dist">It was the <b>${esc(fullName(t))}</b></div>
+    <div class="where">${p ? (ok ? '' : `You picked the ${esc(fullName(p))} · `) : 'No pick · '}${esc(t.arena)}, ${esc(t.town)} · spot was ${fmtDist(distKm(r, t))} away · <a href="${mapsLink(r)}" target="_blank">open in Google Maps</a></div>
+    <div><b>${(r.pts || 0).toLocaleString()}</b> <span style="color:var(--muted)">/ 5,000</span></div>
+    <div class="bar"><div style="width:${(r.pts || 0) / 50}%"></div></div>
+    <div class="btns"><button class="primary" id="nextBtn">${last ? 'See final score' : 'Next round →'}</button></div>`;
+  $('#resPanel').classList.add('on');
+  $('#nextBtn').onclick = () => {
+    if (game.phase !== 'result') return;
+    if (last) { game.phase = 'final'; if (game.mode === 'daily') recordStat(); save(); showFinal(); }
+    else { game.idx++; game.phase = 'play'; save(); showRound(); }
+  };
+}
+function showFinal() {
+  game.idx = ROUNDS - 1; hud(); clearInterval(timerId); $('#timer').hidden = true;
+  $('#block').classList.remove('on'); $('#resPanel').classList.remove('on'); hidePicker();
+  const t = total(), right = game.rounds.filter(r => r.pts > 0).length;
+  $('#endBody').innerHTML = `<div class="hicon">${right === ROUNDS ? '🏆' : right >= 3 ? '🏒' : '🥅'}</div>
+    <div class="endtitle">${t.toLocaleString()} / 25,000</div>
+    <p class="tag" style="margin:0">${right} of ${ROUNDS} right · ${modeLabel()}</p>
+    <div class="egrid">${game.rounds.map(r => r.pts > 0 ? '🟩' : '🟥').join('')}</div>
+    <div class="endbox"><div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(fullName(TEAM[r.ans]))}</a></span>
+      <span>${r.pts > 0 ? '✓' : r.pick ? 'you: ' + esc(TEAM[r.pick].name) : 'no pick'} · <b>${(r.pts || 0).toLocaleString()}</b></span></div>`).join('')}</div></div>
+    ${game.mode === 'daily' ? statsRow() : ''}
+    <div class="hbtns"><button class="primary" id="shareBtn">Copy result</button>${game.mode === 'unl' ? '<button id="againBtn">New game →</button>' : ''}<button id="eHome">⌂ Back to home</button></div>`;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
+  $('#shareBtn').onclick = () => copy(shareText());
+  if ($('#againBtn')) $('#againBtn').onclick = () => startUnlimited(true);
+  $('#eHome').onclick = showHome;
+}
+function shareText() {
+  const label = game.mode === 'daily' ? game.key : MOVES[game.move];
+  return `Name That Team ${label}\n${total().toLocaleString()} / 25,000\n${game.rounds.map(r => r.pts > 0 ? '🟩' : '🟥').join('')}`;
+}
+async function copy(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Copied!');
+}
+
+// ---------- buttons ----------
+$('#guessBtn').onclick = () => makeGuess(false);
+$('#pickToggle').onclick = () => $('#picker').classList.toggle('open');
+$('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(0); } };
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || (e.target.dataset && e.target.dataset.team) || homeOn() || $('#endS').classList.contains('on') || !$('#modal').hidden) return;
+  if ((e.key === ' ' || e.key === 'Enter') && game) {
+    if (game.phase === 'play' && !$('#guessBtn').disabled) { e.preventDefault(); makeGuess(false); }
+    else if (game.phase === 'result' && $('#nextBtn')) { e.preventDefault(); $('#nextBtn').click(); }
+  }
+});
+
+// ---------- stats ----------
+function recordStat() { const s = LS.get('nt:stats', {}); if (!(game.key in s)) { s[game.key] = total(); LS.set('nt:stats', s); } }
+function openStats() {
+  const s = LS.get('nt:stats', {}), keys = Object.keys(s).sort().reverse(), v = keys.map(k => s[k]);
+  const avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  openModal(`<h2>Stats</h2><div class="stats"><div><b>${v.length}</b>Dailies</div><div><b>${avg.toLocaleString()}</b>Average</div><div><b>${(v.length ? Math.max(...v) : 0).toLocaleString()}</b>Best</div></div>
+  <div class="help">${keys.slice(0, 14).map(k => `${niceDate(k)} — <b>${s[k].toLocaleString()}</b>`).join('<br>') || 'No daily games yet.'}</div>`);
+}
+function statsRow() {
+  const v = Object.values(LS.get('nt:stats', {})), avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  return `<div class="hstats"><div><b>${v.length}</b>Dailies</div><div><b>${avg.toLocaleString()}</b>Average</div><div><b>${(v.length ? Math.max(...v) : 0).toLocaleString()}</b>Best</div></div>`;
+}
+
+// ---------- settings / help ----------
+function openSettings(first) {
+  const u = usage();
+  openModal(`<h2>${first ? 'Set up Name That Team' : 'Settings'}</h2>
+  ${first ? setupSteps() : ''}
+  <label>Google Maps API key (shared with Geo Clue)</label><input id="sKey" value="${esc(settings.key === serverKey ? '' : settings.key)}" placeholder="${serverKey ? 'Using the key from your Vercel settings ✓' : 'AIza…'}" autocomplete="off">
+  <p class="help" style="margin:4px 0 0">Saves as soon as you paste it.</p>
+  <div class="grid2">
+    <div><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div><label>Unlimited: round timer</label><select id="sTimer">${[0, 30, 60, 120, 180].map(t => `<option value="${t}" ${t === +settings.timer ? 'selected' : ''}>${t ? t + ' seconds' : 'Off'}</option>`).join('')}</select></div>
+    <div><label>Distance units</label><select id="sUnits"><option value="mi" ${settings.units === 'mi' ? 'selected' : ''}>Miles</option><option value="km" ${settings.units === 'km' ? 'selected' : ''}>Kilometers</option></select></div>
+  </div>
+  <label>Monthly Street View limit, shared with Geo Clue (stops the game at this many loads; Google's free amount is 5,000)</label>
+  <input id="sCap" type="number" min="100" max="5000" step="100" value="${settings.cap}">
+  <div class="usage"><div id="sMeter">${meterHTML()}</div>
+    <div class="help" style="margin-top:8px">This browser alone: ${u.panos.toLocaleString()} Street View loads · ${u.maps.toLocaleString()} map loads (all games). Google's exact total is in Google Cloud Console → Google Maps Platform → Metrics.</div></div>
+  <div class="btns" style="margin-top:14px;justify-content:flex-start"><button class="primary" id="sSave">Save</button></div>`);
+  loadShared().then(renderMeters);
+  const keyAtOpen = settings.key;
+  const readKey = () => $('#sKey').value.trim() || serverKey;
+  $('#sKey').oninput = () => { settings.key = readKey(); saveSettings(); };
+  $('#sSave').onclick = () => {
+    const newKey = readKey();
+    if (!newKey) { toast('Enter an API key'); return; }
+    const keyChanged = newKey !== keyAtOpen;
+    Object.assign(settings, { key: newKey, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
+    saveSettings(); closeModal();
+    if (keyChanged && G) { location.reload(); return; }
+    if (first) startDaily();
+    else if (homeOn()) renderHome();
+    else if (game && game.phase === 'play') hud();
+    else if (game) resume();
+  };
+}
+function setupSteps() {
+  return `<div class="help"><p>Name That Team uses the same Google Maps key as Geo Clue. If you've set up Geo Clue in this browser, you're already done. A 5-round game uses about 5 of the 5,000 free Street View loads per month.</p><ol>
+  <li>Go to <a href="https://developers.google.com/maps/get-started" target="_blank">Google Maps Platform → Get started</a> and create a project. Google requires billing to be set up, even for free usage.</li>
+  <li>Enable the <b>Maps JavaScript API</b>.</li>
+  <li>Under <b>Keys &amp; Credentials</b>, create an API key. Restrict it to your site and to the Maps JavaScript API only.</li>
+  <li>Paste the key below. It's saved in this browser only.<br><b>To make it work on every device:</b> in Vercel add <code>GOOGLE_MAPS_KEY</code> under Settings → Environment Variables, then redeploy.</li></ol></div>`;
+}
+function openHelp() {
+  openModal(`<h2>How to play</h2><div class="help">
+  <p>You're dropped on a street within about 10 miles of an NHL arena. Look around for clues (signs, skyline, sports bars, license plates) then pick which of the 32 teams plays there. Type in the box to find a team fast.</p>
+  <p>Right team = <b>5,000</b> points, wrong = 0. 5 rounds, 5 different teams per game. Every spot is closer to its own team's arena than to any other, so New York and LA spots are fair.</p>
+  <p><b>Daily</b>: same 5 teams for everyone each day, moving allowed, no timer.<br><b>Unlimited</b>: pick a movement rule and timer.</p>
+  <p><b>Moving</b> = walk around · <b>No move</b> = look around only · <b>NMPZ</b> = no moving, panning or zooming.</p>
+  <p>Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
+}
+function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
+function closeModal() { $('#modal').hidden = true; if (homeOn()) renderHome(); }
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+$('#bHome').onclick = showHome;
+$('.logo').onclick = showHome;
+$('#bStats').onclick = openStats;
+$('#bHelp').onclick = openHelp;
+$('#bSettings').onclick = () => openSettings(!settings.key);
+
+// ---------- home screen (Google Maps isn't loaded until you press play) ----------
+function homeOn() { return $('#home').classList.contains('on'); }
+function showHome() { clearInterval(timerId); $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
+function unlMatches(g) { return g && g.phase !== 'final' && g.move === settings.move && g.timer === +settings.timer; }
+function renderHome() {
+  const today = dateKey(new Date()), g = LS.get('nt:g:' + today, null);
+  let status, icon = '🏒', label;
+  if (!settings.key) { status = '<b>Quick setup needed</b><div class="d">Add your Google Maps API key to start</div>'; icon = '🔑'; label = 'Set up & play'; }
+  else if (!g) { status = `<b>Today's 5 teams are waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's 5 teams"; }
+  else if (g.phase !== 'final') { status = `<b>In progress · round ${g.idx + 1}/5</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else { const t = g.rounds.reduce((a, r) => a + (r.pts || 0), 0); status = `<b>${t.toLocaleString()} / 25,000</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = t >= 25000 ? '🏆' : '✅'; label = "See today's result"; }
+  $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  $('#hDaily').textContent = label;
+  const fill = (id, entries, val) => { $(id).innerHTML = entries.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join(''); };
+  fill('#hMove', Object.entries(MOVES), settings.move);
+  fill('#hTimer', [0, 30, 60, 120, 180].map(t => [t, t ? `⏱ ${t}s` : 'No timer']), settings.timer);
+  $('#hUnl').textContent = unlMatches(LS.get('nt:g:unl', null)) ? 'Continue Unlimited game' : 'Play Unlimited';
+  $('#hStatsRow').innerHTML = statsRow();
+  renderMeters();
+  loadShared().then(renderMeters);
+}
+function renderMeters() {
+  $('#hUsage').innerHTML = settings.key ? meterHTML() : '';
+  if ($('#sMeter')) $('#sMeter').innerHTML = meterHTML();
+}
+['#hMove', '#hTimer'].forEach(id => $(id).onchange = () => {
+  Object.assign(settings, { move: $('#hMove').value, timer: +$('#hTimer').value });
+  saveSettings(); renderHome();
+});
+const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
+$('#hDaily').onclick = needKey(() => startDaily());
+$('#hUnl').onclick = needKey(() => startUnlimited(false));
+$('#hHow').onclick = openHelp;
+$('#hStats').onclick = openStats;
+$('#hSet').onclick = () => openSettings(!settings.key);
+
+// ---------- init ----------
+showHome();
+loadServerKey().then(() => { if (homeOn()) renderHome(); });
+</script>
+</body>
+</html>
