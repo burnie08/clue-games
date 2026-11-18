@@ -75,7 +75,7 @@ async function geoNoDb(){
 }
 async function world(){
  const {w,d,src}=make('world-clue.html');
- w.eval(src+';window.__t={g:()=>game,guess,search,draw:drawShape,by:BY,pool:answerPool,all:COUNTRIES.length,route:routeVia,pair:hopPair,mb:mulberry32};');
+ w.eval(src+';window.__t={g:()=>game,guess,search,draw:drawShape,by:BY,pool:answerPool,all:COUNTRIES.length,route:routeVia,pair:hopPair,mb:mulberry32,drawMap:drawHopMap,unl:startUnlimited};');
  await sleep(50);
  const opened=()=>d.querySelectorAll('.cover.open').length;
  console.log('WORLD start: home on',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| puzzles:',[...d.querySelectorAll('#hPuzzles button')].map(b=>b.textContent+(b.disabled?'(off)':'')).join(' '));
@@ -141,6 +141,19 @@ async function world(){
  console.log('      unlimited:',nm(h.start),'->',nm(h.answer),'fewest',h.min,'limit',h.max);
  for(const c of ['jp','gb','au','nz','is','cu','lk','mg','ph','id','tw','sg']) if(!h.done&&c!==h.start&&c!==h.answer) w.__t.guess(c);
  await sleep(1500); console.log('      all islands -> done',h.done,'won',h.won,'| guesses',h.guesses.length,'|',d.querySelector('.endtitle').textContent,'| shown route:',d.querySelector('#endBody .route').textContent.replace(/\s+/g,' ').trim());
+ // ---- Border Hop map mode ----
+ d.querySelector('#eHome').click();
+ console.log('      home mode buttons:',[...d.querySelectorAll('#hHopMode button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '),'| shown',!d.querySelector('#hHopMode').hidden);
+ d.querySelectorAll('#hHopMode button')[1].click(); w.__t.unl(true); await sleep(50); h=w.__t.g();
+ console.log('      map on, before file loads:',d.querySelector('#hopmap').textContent,'| script tag',[...d.querySelectorAll('script')].some(s=>/world\.js/.test(s.src)),'| map btn:',d.querySelector('#mapBtn').textContent);
+ w.eval(fs.readFileSync(path.join(ROOT,'data/world.js'),'utf8')); w.__t.drawMap();
+ const lit=()=>[...d.querySelectorAll('#hopmap path[class]')].map(p=>p.getAttribute('class')).filter(c=>c!=='bg');
+ console.log('      map drawn:',nm(h.start),'->',nm(h.answer),'| paths',d.querySelectorAll('#hopmap path').length,'| lit',lit().join(','),'| labels',[...d.querySelectorAll('#hopmap text')].map(t=>t.textContent).join(', '));
+ const r2=w.__t.route(h.start,h.answer); w.__t.guess(r2[0]); w.__t.guess(h.start==='jp'||h.answer==='jp'?'gb':'jp');
+ console.log('      after 1 good + 1 island guess: lit',lit().join(','),'| labels',[...d.querySelectorAll('#hopmap text')].map(t=>t.textContent).join(', '),'| viewBox',d.querySelector('#hopmap svg').getAttribute('viewBox'));
+ for(const c of r2.slice(1)) w.__t.guess(c); await sleep(1500);
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      won',h.won,'| share:',JSON.stringify(w.__copied));
+ d.querySelector('#eBoard').click(); d.querySelector('#mapBtn').click(); console.log('      map button off -> map hidden',d.querySelector('#hopmap').hidden);
  // many random pairs: always 3-5 in between, and a route exists
  const r=w.__t.mb(42); let bad=0,mins={}; for(let i=0;i<300;i++){const p=w.__t.pair(r);const rt=w.__t.route(p.start,p.answer);if(!rt||rt.length!==p.min||p.min<3||p.min>5)bad++;mins[p.min]=(mins[p.min]||0)+1;}
  console.log('      300 random pairs: bad',bad,'| fewest-in-between counts',JSON.stringify(mins));
