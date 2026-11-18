@@ -17,8 +17,8 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 | `geo-clue.html` | **Geo Clue**: GeoGuessr-style Street View guessing, with challenge links + live rooms. Data: Google Maps JS API |
 | `name-that-team.html` | **Name That Team**: Street View in an NHL city, pick which of the 32 teams plays there. Normal + hard mode. Daily / Unlimited / Challenge / Live. Same Google key + cap as Geo Clue |
 | `hometown-heroes.html` | **Hometown Heroes**: pin where an NHL player grew up (Kraken players badged). Same modes. Player list for review: `docs/hometown-heroes-players.md` |
-| `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so Geo Clue works on every device |
-| `api/room.js` | Vercel function: Geo Clue live rooms, stored in Upstash Redis |
+| `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so all three Street View games (Geo Clue, Name That Team, Hometown Heroes) work on every device |
+| `api/room.js` | Vercel function: live rooms for all three Street View games (`settings.game` = `geo` / `ntt` / `hh` says which page a room belongs to), stored in Upstash Redis |
 | `api/usage.js` | Vercel function: shared monthly Street View counter for all players (Redis key `gc:usage:YYYY-MM`, UTC month) |
 | `tests/` | Smoke tests that run the games in a fake browser with fake APIs (see Testing) |
 
@@ -47,7 +47,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 
 ## Geo Clue multiplayer
 - **Challenge links**: `geo-clue.html?c=<base64url JSON>`. Format v1: `{v:1, p:pack, m:move, t:timer, r:[[panoId, heading, region]×5], s:[[name, [pts×5]], …]}`. Locations are re-read from Street View metadata by pano ID.
-- **Live rooms**: `geo-clue.html?room=CODE`. `/api/room` actions: `create`, `join`, `get`, `start`, `guess`, `next`, `endround`, `settings`. Host-only: start/next/endround/settings. Rooms expire after 6h, max 10 players. Each browser *tab* is one player (`sessionStorage` id).
+- **Live rooms**: `geo-clue.html?room=CODE`. `/api/room` actions: `create`, `join`, `get`, `start`, `guess`, `next`, `endround`, `settings`. Host-only: start/next/endround/settings. `join` takes the page's `game`; if the room is for another game it answers `{ok:false, game}` without adding the player, and the page redirects there (no ghost players). Rooms expire after 6h, max 10 players. Each browser *tab* is one player (`sessionStorage` id).
 - Redis keys: `gc:room:CODE` (room JSON), `gc:room:CODE:p` (players hash), `gc:room:CODE:g` (guesses hash, field `round:playerId`).
 
 ## Name That Team / Hometown Heroes multiplayer
@@ -62,7 +62,7 @@ npm install           # first time only (installs jsdom)
 node smoke-single.js        # home → play → end → home for all three games
 node smoke-multiplayer.js   # 2-player live room + challenge link round trip
 node smoke-live-timer.js    # live room timer settings + timeouts
-node smoke-room-games.js    # room API with game/hard/ans/pick
+node smoke-room-games.js    # room API with game/hard/ans/pick, Geo Clue redirects + hostile challenge links
 node smoke-ntt.js           # Name That Team solo
 node smoke-ntt-multi.js     # Name That Team challenge + live room
 node smoke-hh.js            # Hometown Heroes
