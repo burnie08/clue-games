@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "description": "Smoke tests for Clue Games (not deployed)",
+  "devDependencies": { "jsdom": "^24.1.0" }
+}
