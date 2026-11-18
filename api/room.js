@@ -100,6 +100,11 @@ module.exports = async (req, res) => {
       else Object.assign(room, { round: room.round + 1, startedAt: Date.now() });
     } else if (action === 'endround') {
       room.forceEnd = room.round;
+    } else if (action === 'settings') {
+      if (room.state !== 'lobby') return fail(409, 'The game has already started');
+      const s = body.settings || {};
+      if (s.timer != null) room.settings.timer = Math.max(0, Math.min(600, +s.timer || 0));
+      if (['move', 'nomove', 'nmpz'].includes(s.move)) room.settings.move = s.move;
     } else return fail(400, 'Unknown action');
     await saveRoom(room);
     return res.status(200).json({ ok: true });

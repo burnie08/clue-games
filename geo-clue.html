@@ -150,9 +150,10 @@ nav button.on{background:var(--accent);color:#1a1300}
   </div>
   <div class="opts">
     <div class="optsTitle">⚔ Play with friends</div>
+    <div class="grid3" style="margin-bottom:8px"><select id="lPack" title="Live room map"></select><select id="lMove" title="Live room movement"></select><select id="lTimer" title="Live room round timer"></select></div>
     <button id="hCreate" class="primary" style="width:100%">Create a live room</button>
     <div style="display:flex;gap:6px;margin-top:8px"><input id="hCode" placeholder="Room code" maxlength="6" autocomplete="off"><button id="hJoin">Join</button></div>
-    <p class="help" style="margin:8px 0 0">Live rooms use the Unlimited map, movement and timer above. You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
+    <p class="help" style="margin:8px 0 0">Pick the live room's map, movement and round timer above. As host you can still change movement and timer in the lobby. You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
   </div>
   <div id="hStatsRow"></div>
   <p class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></p>
@@ -225,7 +226,9 @@ function showMsg(html) { $('#msgInner').innerHTML = html; $('#msg').classList.ad
 function hideMsg() { $('#msg').classList.remove('on'); }
 
 // ---------- settings & usage ----------
-let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000 }, LS.get('gc:settings', {}));
+let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000, livePack: 'world', liveMove: 'move', liveTimer: 120 }, LS.get('gc:settings', {}));
+const LIVE_TIMERS = [0, 30, 60, 90, 120, 180, 300];
+const timerName = t => !t ? 'No timer' : t % 60 ? t + 's' : (t / 60) + ' min';
 // Optional: a key stored in Vercel (Settings → Environment Variables → GOOGLE_MAPS_KEY) is served by /api/config,
 // so every device works without pasting the key. A key typed into ⚙ Settings takes priority.
 let serverKey = '';
@@ -578,11 +581,18 @@ function renderHome() {
   fill('#hPack', Object.entries(PACKS).map(([k, p]) => [k, p.name]), settings.pack);
   fill('#hMove', Object.entries(MOVES), settings.move);
   fill('#hTimer', [0, 30, 60, 120, 180].map(t => [t, t ? `⏱ ${t}s` : 'No timer']), settings.timer);
+  fill('#lPack', Object.entries(PACKS).map(([k, p]) => [k, p.name]), settings.livePack);
+  fill('#lMove', Object.entries(MOVES), settings.liveMove);
+  fill('#lTimer', LIVE_TIMERS.map(t => [t, '⏱ ' + timerName(t)]), settings.liveTimer);
   $('#hUnl').textContent = unlMatches(LS.get('gc:g:unl', null)) ? 'Continue Unlimited game' : 'Play Unlimited';
   $('#hStatsRow').innerHTML = statsRow();
   const u = usage();
   $('#hUsage').textContent = settings.key ? `Street View loads this month: ${u.panos.toLocaleString()} of your ${settings.cap.toLocaleString()} limit` : '';
 }
+['#lPack', '#lMove', '#lTimer'].forEach(id => $(id).onchange = () => {
+  Object.assign(settings, { livePack: $('#lPack').value, liveMove: $('#lMove').value, liveTimer: +$('#lTimer').value });
+  saveSettings();
+});
 ['#hPack', '#hMove', '#hTimer'].forEach(id => $(id).onchange = () => {
   Object.assign(settings, { pack: $('#hPack').value, move: $('#hMove').value, timer: +$('#hTimer').value });
   saveSettings(); renderHome();
@@ -698,13 +708,14 @@ function createRoom() {
   askName(async () => {
     hideHome();
     if (!(await boot())) return;
-    showMsg(`Finding 5 locations in ${esc(PACKS[settings.pack].name)}…`);
+    const pack = PACKS[settings.livePack] ? settings.livePack : 'world';
+    showMsg(`Finding 5 locations in ${esc(PACKS[pack].name)}…`);
     const rng = mulberry32((Math.random() * 2 ** 32) >>> 0), rounds = [];
-    try { for (let i = 0; i < ROUNDS; i++) rounds.push(await findLocation(rng, settings.pack)); }
+    try { for (let i = 0; i < ROUNDS; i++) rounds.push(await findLocation(rng, pack)); }
     catch (e) { showMsg(esc(e.message)); return; }
     try {
       live = { code: null };
-      const j = await api('create', { settings: { pack: settings.pack, move: settings.move, timer: +settings.timer },
+      const j = await api('create', { settings: { pack, move: settings.liveMove, timer: +settings.liveTimer },
         rounds: rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, desc: r.desc, region: r.region })) });
       enterRoom(j.code);
     } catch (e) { live = null; showHome(); apiError(e); }
@@ -858,19 +869,29 @@ function showLiveFinal(d) {
 }
 function renderLobby(d) {
   const room = d.room, ids = Object.keys(d.players), host = room.hostId === sessId();
+  const sig = JSON.stringify([ids, ids.map(id => d.players[id].name), room.settings]);
+  if (live.lobbySig === sig && $('#lobby').classList.contains('on')) return;
+  live.lobbySig = sig;
+  const opt = (list, val) => list.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join('');
   const link = location.origin + location.pathname + '?room=' + room.code;
   $('#lobbyBody').innerHTML = `<div class="hicon">🌍</div><div class="hlogo small">Geo<span>Clue</span> · Live room</div>
     <p class="tag" style="margin:0">Room code</p><div class="rcode">${esc(room.code)}</div>
     <div style="display:flex;gap:6px;margin:10px 0 16px"><input readonly value="${esc(link)}" id="lbLink"><button id="lbCopy">Copy invite</button></div>
     <div class="today" style="display:block"><b>Players (${ids.length}/10)</b>
       <div class="rounds" style="margin:8px 0 0">${ids.map((id, i) => `<div><span><span style="color:${COLORS[i % COLORS.length]}">●</span> ${esc(d.players[id].name)}${id === room.hostId ? ' 👑' : ''}${id === sessId() ? ' (you)' : ''}</span></div>`).join('')}</div></div>
-    <p class="help">${esc((PACKS[room.settings.pack] || PACKS.world).name)} · ${MOVES[room.settings.move] || 'Moving'} · ${room.settings.timer ? room.settings.timer + 's per round' : 'no timer'} · 5 rounds</p>
+    ${host ? `<div class="grid2" style="text-align:left;margin:0 0 6px">
+        <div><div class="help">Movement</div><select id="lbMove">${opt(Object.entries(MOVES), room.settings.move)}</select></div>
+        <div><div class="help">Round timer</div><select id="lbTimer">${opt(LIVE_TIMERS.map(t => [t, timerName(t)]), room.settings.timer)}</select></div></div>
+      <p class="help">Map: ${esc((PACKS[room.settings.pack] || PACKS.world).name)} · 5 rounds</p>`
+    : `<p class="help">${esc((PACKS[room.settings.pack] || PACKS.world).name)} · ${MOVES[room.settings.move] || 'Moving'} · ⏱ ${room.settings.timer ? timerName(room.settings.timer) + ' per round' : 'no timer'} · 5 rounds</p>`}
     <div class="hbtns">${host ? `<button class="primary" id="lbStart">Start game · ${ids.length} player${ids.length > 1 ? 's' : ''}</button>` : '<button disabled>Waiting for the host to start…</button>'}
       <button id="lbLeave">Leave room</button></div>`;
   $('#lobby').classList.add('on');
   $('#lbCopy').onclick = () => copy(link);
   $('#lbLink').onclick = e => e.target.select();
   if ($('#lbStart')) $('#lbStart').onclick = () => { $('#lbStart').disabled = true; api('start').then(pollRoom).catch(apiError); };
+  const pushSettings = () => api('settings', { settings: { move: $('#lbMove').value, timer: +$('#lbTimer').value } }).then(pollRoom).catch(apiError);
+  if ($('#lbMove')) { $('#lbMove').onchange = pushSettings; $('#lbTimer').onchange = pushSettings; }
   $('#lbLeave').onclick = () => { leaveRoom(); showHome(); };
 }
 $('#hCreate').onclick = needKey(createRoom);
