@@ -9,6 +9,7 @@ const thisMonth=()=>new Date().getFullYear()+'-'+String(new Date().getMonth()+1)
 function browser(opts={}){
  const dom=new JSDOM(html,{runScripts:'outside-only',url:'https://clue-games.vercel.app/name-that-team.html'});const w=dom.window;
  w.localStorage.setItem('gc:settings',JSON.stringify(Object.assign({key:'AIzaX'},opts.gc||{})));
+ if(opts.nt)w.localStorage.setItem('nt:settings',JSON.stringify(opts.nt));
  w.navigator.clipboard={writeText:async t=>{w.__copied=t}};
  const st={panos:0,posts:0,reqs:[],shared:opts.shared==null?null:opts.shared};
  class LL{constructor(a,b){this.a=a;this.b=b}lat(){return this.a}lng(){return this.b}}
@@ -22,7 +23,7 @@ function browser(opts={}){
   if(u.includes('api/usage')){if(st.shared==null)return{ok:false,status:503,json:async()=>({error:'nodb'})};if(o&&o.method==='POST'){st.posts++;st.shared++;}return{ok:true,status:200,json:async()=>({month:thisMonth(),panos:st.shared,free:5000})};}
   if(u.includes('api/config'))return{ok:true,status:200,json:async()=>({googleMapsKey:''})};
   return{ok:false,status:404,json:async()=>({})};};
- w.eval(src+';window.__t={g:()=>game,TEAMS,TEAM,nearestTeam,findTeamSpot,scoreTeam,distKm};');
+ w.eval(src+';window.__t={g:()=>game,TEAMS,TEAM,nearestTeam,findTeamSpot,scoreTeam,distKm,bearing,makeRounds,shuffle,mulberry32,makeGuess,selectTeam,sv:()=>sv,pano:()=>pano};');
  const d=w.document;
  return {w,d,st,
   async ready(){await sleep(20);if(w.__gcReady)await w.__gcReady();await sleep(80);},
@@ -81,7 +82,58 @@ const full=t=>t.city+' '+t.name;
   C.d.querySelector('#hUnl').click();await C.ready();
   const u=JSON.parse(C.w.localStorage.getItem('gc:usage')||'{"panos":0}');
   console.log('      cap message:',C.d.querySelector('#msgInner').textContent.slice(0,80));
-  check('cap blocks round: message, no pano, no bump',on(C.d,'#msg')&&/limit/.test(C.d.querySelector('#msgInner').textContent)&&C.st.panos===0&&C.st.posts===0&&!u.panos);}
+  check('cap blocks round: message, no pano, no bump',on(C.d,'#msg')&&/limit/.test(C.d.querySelector('#msgInner').textContent)&&C.st.panos===0&&C.st.posts===0&&!u.panos);
+  check('cap blocks before Google Maps loads (unlimited)',!C.googleLoaded());
+  const C2=browser({shared:4500,gc:{cap:4000}});await sleep(40);C2.d.querySelector('#hDaily').click();await C2.ready();
+  check('cap blocks before Google Maps loads (daily)',on(C2.d,'#msg')&&/limit/.test(C2.d.querySelector('#msgInner').textContent)&&!C2.googleLoaded());}
+
+ // ===== hard mode =====
+ {const t=A.w.__t,angleDiff=(a,b)=>{const d=Math.abs(a-b)%360;return d>180?360-d:d;};
+  const names=['SEA','BOS','VGK','TOR','NYR'];let okH=true,okD=true,worstD=0,minA=999,maxA=0;
+  for(let k=0;k<20;k++){const team=t.TEAM[names[k%5]];const r=await t.findTeamSpot(Math.random,team,true);
+   const a=angleDiff(r.heading,t.bearing(r,team)),d=t.distKm(r,team);minA=Math.min(minA,a);maxA=Math.max(maxA,a);worstD=Math.max(worstD,d);
+   if(a<140||a>180)okH=false;if(d>0.3)okD=false;}
+  console.log('      hard heading diff range:',minA.toFixed(1),'-',maxA.toFixed(1),'| furthest:',(worstD*1000).toFixed(0),'m');
+  check('ntt hard heading: facing away from arena (140-180 deg off, 20 spots)',okH);
+  check('hard spot near arena: every spot <= 0.3 km',okD);
+  const sea=[];for(let k=0;k<10;k++){const r=await t.findTeamSpot(Math.random,t.TEAM.SEA,true);sea.push(r.pano+'|'+r.heading);}
+  check('hard varies: 10 SEA spots give at least 5 distinct',new Set(sea).size>=5);
+  // a pano too far away is rejected and retried
+  const before=A.st.reqs.length,sv=t.sv(),orig=sv.getPanorama;let first=true;
+  sv.getPanorama=async r=>{const res=await orig.call(sv,r);if(first){first=false;res.data.location.latLng=new (res.data.location.latLng.constructor)(r.location.lat+0.01,r.location.lng);}return res;};
+  const far=await t.findTeamSpot(Math.random,t.TEAM.SEA,true);sv.getPanorama=orig;
+  const hr=A.st.reqs.slice(before);
+  check('hard spot retried when pano is farther than 0.3 km, radius 150',hr.length===2&&hr.every(r=>r.radius===150&&r.preference==='nearest'&&r.sources[0]==='g')&&t.distKm(far,t.TEAM.SEA)<=0.3);}
+
+ {const H=browser({shared:10,nt:{hard:true,move:'move',timer:0}});await sleep(40);
+  check('hard toggle on home screen, move/timer hidden while on',H.d.querySelector('#hHard').checked&&H.d.querySelector('#hOpts').hidden);
+  H.d.querySelector('#hUnl').click();await H.ready();
+  const g=H.w.__t.g(),po=H.w.__t.pano().o;
+  check('hard locks view: game.hard, NMPZ, 25s timer, #block on, no links/clickToGo',g.hard===true&&g.move==='nmpz'&&g.timer===25&&on(H.d,'#block')&&po.linksControl===false&&po.clickToGo===false&&H.d.querySelector('#timer').textContent==='⏱ 25s');
+  H.w.__t.selectTeam(g.rounds[0].ans);H.w.__t.makeGuess(true);
+  check('hard timeout scores 0 even with a team highlighted',g.rounds[0].pts===0&&g.phase==='result'&&!on(H.d,'#block'));
+  H.d.querySelector('#nextBtn').click();
+  H.w.__t.selectTeam(g.rounds[1].ans);H.d.querySelector('#guessBtn').click();
+  check('hard: submitting the right team in time still scores 5000',g.rounds[1].pts===5000);
+  // normal mode keeps highlighted-team-on-timeout behaviour
+  const N=browser({shared:10,nt:{hard:false,move:'nmpz',timer:30}});await sleep(40);N.d.querySelector('#hUnl').click();await N.ready();
+  const gn=N.w.__t.g();N.w.__t.selectTeam(gn.rounds[0].ans);N.w.__t.makeGuess(true);
+  check('normal mode timeout keeps the highlighted pick (5000)',gn.hard===false&&gn.rounds[0].pts===5000);
+  // daily ignores hard
+  const Dd=browser({shared:10,nt:{hard:true}});await sleep(40);Dd.d.querySelector('#hDaily').click();await Dd.ready();
+  const gd=Dd.w.__t.g(),pd=Dd.w.__t.pano().o;
+  check('daily ignores hard: normal mode, moving, no timer, no block',gd.mode==='daily'&&gd.hard===false&&gd.move==='move'&&gd.timer===0&&!on(Dd.d,'#block')&&pd.clickToGo===true&&Dd.d.querySelector('#timer').hidden&&Dd.st.reqs.every(r=>r.radius===2000));}
+
+ // ===== one bad team does not sink the game =====
+ {const t=A.w.__t,sv=t.sv(),orig=sv.getPanorama;
+  const order=t.shuffle(t.TEAMS,t.mulberry32(77)),bad=order[0];
+  sv.getPanorama=async r=>{if(t.distKm(r.location,bad)<20)throw new Error('ZERO_RESULTS');return orig.call(sv,r);};
+  const run=async()=>(await t.makeRounds(t.mulberry32(77),false)).map(r=>r.ans).join();
+  const r1=await run(),r2=await run();sv.getPanorama=orig;
+  console.log('      skipped',bad.code,'->',r1);
+  check('bad team skipped: 5 distinct teams, same order each time, bad team absent',r1.split(',').length===5&&new Set(r1.split(',')).size===5&&!r1.includes(bad.code)&&r1===r2&&r1===order.slice(1,6).map(x=>x.code).join());
+  sv.getPanorama=async()=>{throw new Error('none');};let threw=false;try{await t.makeRounds(t.mulberry32(5),false);}catch(e){threw=true;}sv.getPanorama=orig;
+  check('makeRounds still throws when no team has coverage',threw);}
 
  // ===== home -> play -> end -> home =====
  {const D=browser({shared:10});await sleep(40);
