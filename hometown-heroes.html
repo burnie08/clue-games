@@ -394,25 +394,33 @@ function roundPlan(seed) {
   const slots = shuffle([0, 1, 2, 3, 4].map(i => i < nK ? 1 : 0), rng);   // 1 = Kraken slot
   return { slots, groups };
 }
-// Today's 5 players (assuming every hometown has Street View)
+// Today's 5 players (assuming every hometown has Street View). Like makeRounds, a player from a town
+// already in the game is skipped for the next player of the same group.
 function pickDaily(key) {
-  const { slots, groups } = roundPlan(hash('hh-' + key)), next = [0, 0];
-  return slots.map(s => groups[s][next[s]++].id);
+  const { slots, groups } = roundPlan(hash('hh-' + key)), next = [0, 0], towns = new Set();
+  return slots.map(s => {
+    let p = groups[s][next[s]++];
+    while (towns.has(p.town)) p = groups[s][next[s]++];
+    towns.add(p.town); return p.id;
+  });
 }
 // Walk the plan: a hometown with no Street View is skipped for the next player of the same group, so the
 // Kraken mix holds and Daily is the same on every device. Each player's heading comes from the seed + their id.
+// A player whose town (or whose found pano) is already in this game is skipped the same way: no repeat rounds.
 async function makeRounds(seed) {
-  const { slots, groups } = roundPlan(seed), next = [0, 0], rounds = [];
+  const { slots, groups } = roundPlan(seed), next = [0, 0], rounds = [], towns = new Set(), panos = new Set();
   let misses = 0;
   for (const s of slots) {
     let r = null;
     while (!r && next[s] < groups[s].length && misses < MAX_MISSES) {
       const p = groups[s][next[s]++];
+      if (towns.has(p.town)) continue;   // same town as an earlier round: no lookup needed
       r = await findHometownSpot(p, mulberry32(hash(seed + ':' + p.id)));
+      if (r && panos.has(r.pano)) { r = null; continue; }   // different town but the same pano: skip, not a coverage miss
       misses = r ? 0 : misses + 1;
     }
     if (!r) throw new Error('Could not find Street View in the players\' hometowns. Try again.');
-    rounds.push(r);
+    towns.add(BY_ID[r.ans].town); panos.add(r.pano); rounds.push(r);
   }
   return rounds;
 }
@@ -879,7 +887,7 @@ function joinRoom(code) {
   askName(async () => {
     if (overCap()) { hideHome(); showCapMsg(); return; }
     live = { code };
-    let jr; try { jr = await api('join'); } catch (e) { live = null; apiError(e); return; }
+    let jr; try { jr = await api('join', { game: 'hh' }); } catch (e) { live = null; apiError(e); return; }
     if (otherGame(jr && jr.game, code)) return;
     hideHome();
     if (!(await boot())) return;

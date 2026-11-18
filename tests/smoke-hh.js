@@ -26,7 +26,7 @@ async function callApi(body){return new Promise(res=>{const r={code:200,setHeade
 const roomOf=code=>JSON.parse(db.get('gc:room:'+code));
 // ---- browser factory: fake Street View returns a pano exactly at the requested point (unless the point is in opts.noCover);
 //      pano-id lookups read it back ----
-const panoLocs={};let panoN=0;
+const panoLocs={},panoAt={};let panoN=0;   // the same spot always gives the same pano, like real Street View
 function browser(name,opts={}){
  const dom=new JSDOM(html,{runScripts:'outside-only',url:opts.url||URL0});const w=dom.window;
  w.localStorage.setItem('gc:settings',JSON.stringify(Object.assign({key:'AIzaX',name},opts.gc||{})));
@@ -43,13 +43,13 @@ function browser(name,opts={}){
   if(r.pano){const l=panoLocs[r.pano];if(!l)throw new Error('ZERO_RESULTS');return{data:{location:{pano:r.pano,latLng:new LL(l.lat,l.lng),description:'X'}}}}
   if(!r.sources||r.sources[0]!=='g')throw new Error('not google-only');
   if((opts.noCover||[]).some(p=>near(p,r.location)))throw new Error('ZERO_RESULTS');
-  const id='P'+(++panoN);panoLocs[id]={lat:r.location.lat,lng:r.location.lng};return{data:{location:{pano:id,latLng:new LL(r.location.lat,r.location.lng),description:'X'}}}}}
- w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g'}},marker:{Marker}})[k]}};
+  const lk=r.location.lat+','+r.location.lng,id=panoAt[lk]||(panoAt[lk]='P'+(++panoN));panoLocs[id]={lat:r.location.lat,lng:r.location.lng};return{data:{location:{pano:id,latLng:new LL(r.location.lat,r.location.lng),description:'X'}}}}}
+ w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g',OUTDOOR:'o'}},marker:{Marker}})[k]}};
  w.fetch=async(u,o)=>{u=String(u);
   if(u.includes('api/usage')){if(o&&o.method==='POST')st.posts++;if(st.shared==null)return{ok:false,status:503,json:async()=>({error:'nodb'})};if(o&&o.method==='POST')st.shared++;return{ok:true,status:200,json:async()=>({month:thisMonth(),panos:st.shared,free:5000})};}
   if(u.includes('api/config'))return{ok:true,status:200,json:async()=>({googleMapsKey:''})};
   const {status,j}=await callApi(JSON.parse(o.body));return{ok:status<300,status,json:async()=>j};};
- w.eval(src+';window.__t={g:()=>game,PLAYERS,BY_ID,pickDaily,findHometownSpot,makeRounds,scoreFor,distKm,HH_SIZE,dateKey,map:()=>map,pano:()=>pano,sv:()=>sv,pc:()=>pendingChal,b64d,poll:pollRoom,live:()=>live,makeGuess};');
+ w.eval(src+';window.__t={hash,roundPlan,g:()=>game,PLAYERS,BY_ID,pickDaily,findHometownSpot,makeRounds,scoreFor,distKm,HH_SIZE,dateKey,map:()=>map,pano:()=>pano,sv:()=>sv,pc:()=>pendingChal,b64d,poll:pollRoom,live:()=>live,makeGuess};');
  const d=w.document;
  return {w,d,st,
   async ready(){await sleep(20);if(w.__gcReady)await w.__gcReady();await sleep(80);},
@@ -86,6 +86,29 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
  {const look=A.st.reqs.filter(r=>!r.pano);
   check('every lookup: Google-only, radius 5000, nearest, at the hometown',look.length===5&&look.every((r,i)=>r.sources[0]==='g'&&r.radius===5000&&r.preference==='nearest'&&r.location.lat===T.BY_ID[idsA[i]].lat&&r.location.lng===T.BY_ID[idsA[i]].lng));}
  {const r=T.g().rounds[0];check('round shape {pano, lat, lng, heading, ans, pts:null}',typeof r.pano==='string'&&isFinite(r.lat)&&isFinite(r.heading)&&r.ans===idsA[0]&&r.pts===null);}
+
+ // ===== no duplicate towns or panos in one game =====
+ {const towns=[...new Set(T.PLAYERS.map(p=>p.town))].filter(t=>T.PLAYERS.filter(p=>p.town===t).length>1);
+  console.log('      shared hometowns:',towns.join(', '));
+  // a day whose plain plan (first players in each group) would put two players from the same town in one game
+  let dupKey=null;
+  for(let k=0;k<2000&&!dupKey;k++){const key=T.dateKey(new Date(2026,0,1+k)),{slots,groups}=T.roundPlan(T.hash('hh-'+key)),nx=[0,0];
+   const naive=slots.map(s=>groups[s][nx[s]++]);if(new Set(naive.map(p=>p.town)).size<5)dupKey=key;}
+  console.log('      day with a same-town pair in its plain plan:',dupKey);
+  const C=browser('C',{shared:10}),D=browser('D',{shared:10});await sleep(30);
+  C.d.querySelector('#hUnl').click();D.d.querySelector('#hUnl').click();await C.ready();await D.ready();
+  const rc=await C.w.__t.makeRounds(C.w.__t.hash('hh-'+dupKey)),rd=await D.w.__t.makeRounds(D.w.__t.hash('hh-'+dupKey));
+  const tw=rc.map(r=>T.BY_ID[r.ans].town),nK=rc.filter(r=>T.BY_ID[r.ans].kraken).length;
+  console.log('      that day ->',rc.map(r=>r.ans).join(' '),'|',tw.join(' / '));
+  check('same-town day: 5 different towns and panos, 2-3 Kraken',!!dupKey&&new Set(tw).size===5&&new Set(rc.map(r=>r.pano)).size===5&&nK>=2&&nK<=3);
+  check('same-town day: two browsers match, and pickDaily agrees',rc.map(r=>r.ans+r.pano+r.heading).join()===rd.map(r=>r.ans+r.pano+r.heading).join()&&rc.map(r=>r.ans).join()===T.pickDaily(dupKey).join());
+  {let ok=true;for(let k=0;k<200;k++){const ids=T.pickDaily(T.dateKey(new Date(2026,0,1+k)));if(new Set(ids.map(id=>T.BY_ID[id].town)).size!==5)ok=false;}
+   check('pickDaily over 200 dates: never two players from the same town',ok);}
+  // two different towns that land on the same pano: the second is skipped too
+  const sv=C.w.__t.sv(),orig=sv.getPanorama,seed=12345;let firstPano=null;
+  sv.getPanorama=async r=>{const res=await orig.call(sv,r);if(!firstPano)firstPano=res;else if(!r.pano&&sv.__n++===0)return firstPano;return res;};sv.__n=0;
+  const rs=await C.w.__t.makeRounds(seed);sv.getPanorama=orig;
+  check('a repeated pano is skipped: still 5 rounds, all panos different',rs.length===5&&new Set(rs.map(r=>r.pano)).size===5);}
 
  // ===== hh skip no coverage =====
  {const first=T.BY_ID[T.pickDaily(today)[0]];
@@ -223,10 +246,13 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   const geo=await mk({}),ntt=await mk({game:'ntt'}),hh=await mk({game:'hh'});
   const G1=browser('Sam',{url:URL0+'?room='+geo});await sleep(60);G1.d.querySelector('#hJoinInv').click();await sleep(200);
   check('geo room -> geo-clue.html?room=CODE',G1.w.__went==='geo-clue.html?room='+geo&&!G1.w.__t.g());
+  check('hh page joining a geo room leaves no ghost player',Object.keys(db.get('gc:room:'+geo+':p')||{}).join()==='h');
   const G2=browser('Sam',{url:URL0+'?room='+ntt});await sleep(60);G2.d.querySelector('#hJoinInv').click();await sleep(200);
   check('ntt room -> name-that-team.html?room=CODE',G2.w.__went==='name-that-team.html?room='+ntt);
+  check('hh page joining an ntt room leaves no ghost player',Object.keys(db.get('gc:room:'+ntt+':p')||{}).join()==='h');
   const G3=browser('Sam',{url:URL0+'?room='+hh});await sleep(60);G3.d.querySelector('#hJoinInv').click();await sleep(50);await G3.ready();await sleep(50);
   check('hh room is not redirected',G3.w.__went===undefined&&on(G3.d,'#lobby'));
+  check('hh room joined in one step (one Join click)',Object.keys(db.get('gc:room:'+hh+':p')||{}).length===2);
   const r5=[['a',0,'r'],['b',0,'r'],['c',0,'r'],['d',0,'r'],['e',0,'r']];
   const geoLink=b64({v:1,p:'world',m:'move',t:0,r:r5,s:[]});
   const L1=browser('Sam',{url:URL0+'?c='+geoLink});await sleep(30);

@@ -1,4 +1,5 @@
-// Geo Clue live rooms. Stores rooms in Upstash Redis (connect it in Vercel → Storage → Upstash for Redis;
+// Live rooms for all three Street View games (Geo Clue, Name That Team, Hometown Heroes; settings.game says which).
+// Stores rooms in Upstash Redis (connect it in Vercel → Storage → Upstash for Redis;
 // the integration adds KV_REST_API_URL / KV_REST_API_TOKEN automatically). Rooms expire after 6 hours.
 //
 // Keys:  gc:room:CODE    → room JSON {code, hostId, settings, rounds, state, round, startedAt, forceEnd}
@@ -74,12 +75,16 @@ module.exports = async (req, res) => {
 
     if (action === 'join') {
       if (!id) return fail(400, 'Bad request');
+      // the page says which game it is: a room for another game isn't joined here, so the page can hand
+      // over to the right one without leaving a "ghost" player behind (older pages send no game and just join)
+      const game = room.settings.game || 'geo';
+      if (body.game != null && body.game !== game) return res.status(200).json({ ok: false, game });
       if (!data.players[id]) {
         if (room.state !== 'lobby') return fail(409, 'That game has already started.');
         if (Object.keys(data.players).length >= MAX_PLAYERS) return fail(409, `Room is full (max ${MAX_PLAYERS}).`);
       }
       await redis([['HSET', K + ':p', id, JSON.stringify({ name: clean(body.name, 24) || 'Player' })], ['EXPIRE', K + ':p', TTL]]);
-      return res.status(200).json({ ok: true, game: room.settings.game || 'geo' });
+      return res.status(200).json({ ok: true, game });
     }
 
     if (action === 'guess') {

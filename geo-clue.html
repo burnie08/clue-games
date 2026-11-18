@@ -656,10 +656,26 @@ function askName(cb) {
 function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
 function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return JSON.parse(decodeURIComponent(escape(atob(s)))); }
 let pendingChal = null, pendingRoom = null;
+// lookups by a key that came from a link or a room: Object.hasOwn so names like "constructor" don't count
+const has = (o, k) => Object.hasOwn(o, k);
 function readUrl() {
   const p = new URLSearchParams(location.search);
-  try { const c = p.get('c'); if (c) { const ch = b64d(c); if (ch && Array.isArray(ch.r) && ch.r.length === ROUNDS) pendingChal = ch; else throw 0; } }
-  catch (e) { toast('That challenge link looks broken'); }
+  try {
+    const c = p.get('c');
+    if (c) {
+      const ch = b64d(c);
+      if (!ch || !Array.isArray(ch.r) || ch.r.length !== ROUNDS) throw 0;
+      if (ch.g && ch.g !== 'geo') { if (!has(GAME_PAGES, ch.g)) throw 0; goPage(GAME_PAGES[ch.g] + location.search); return; }   // another game's link
+      if (!ch.r.every(x => Array.isArray(x) && typeof x[0] === 'string')) throw 0;
+      ch.p = has(PACKS, ch.p) ? ch.p : 'world';
+      ch.m = has(MOVES, ch.m) ? ch.m : 'move';
+      ch.t = Math.max(0, Math.min(600, Math.round(+ch.t || 0)));
+      // scores come from whoever made the link: keep only [name, 5 numbers 0-5000] entries
+      ch.s = (Array.isArray(ch.s) ? ch.s : []).filter(x => Array.isArray(x) && Array.isArray(x[1]) && x[1].length === ROUNDS)
+        .map(([n, p]) => [String(n).slice(0, 24), p.map(v => Math.max(0, Math.min(5000, Math.round(+v || 0))))]);
+      pendingChal = ch;
+    }
+  } catch (e) { toast('That challenge link looks broken'); }
   const rm = p.get('room'); if (rm) pendingRoom = rm.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 }
 function chalId(ch) { return hash(ch.r.map(x => x[0]).join('|') + ch.p + ch.m + ch.t).toString(36); }
@@ -686,7 +702,7 @@ async function startChallenge(ch) {
   hideHome();
   if (!(await boot())) return;
   const cid = chalId(ch), saved = LS.get('gc:c:' + cid, null);
-  if (saved) { game = saved; game.chal = { s: Array.isArray(ch.s) ? ch.s : [] }; save(); return resume(); }
+  if (saved) { game = saved; game.chal = { s: ch.s }; save(); return resume(); }
   showMsg('Loading the challenge…');
   const rounds = [];
   try {
@@ -696,15 +712,15 @@ async function startChallenge(ch) {
         desc: data.location.description || '', region: region || 'Location', guess: null, km: null, pts: null });
     }
   } catch (e) { showMsg('Couldn\'t load one of the challenge locations. The link may be broken or the imagery was removed.'); return; }
-  game = { mode: 'chal', key: 'chal', cid, pack: PACKS[ch.p] ? ch.p : 'world', move: MOVES[ch.m] ? ch.m : 'move', timer: +ch.t || 0,
-    rounds, idx: 0, phase: 'play', chal: { s: Array.isArray(ch.s) ? ch.s : [] } };
+  game = { mode: 'chal', key: 'chal', cid, pack: ch.p, move: ch.m, timer: ch.t,   // all cleaned in readUrl
+    rounds, idx: 0, phase: 'play', chal: { s: ch.s } };
   save(); resume();
 }
 function chalBoard() {
-  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + x, 0) })).sort((a, b) => b.t - a.t);
+  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + (+x || 0), 0) })).sort((a, b) => b.t - a.t);
   return `<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">⚔ Challenge leaderboard</div>
     <div class="rounds">${rows.map((x, i) => `<div><span>${i === 0 ? '🏆' : (i + 1) + '.'} ${esc(x.n)}${x.n === myName() ? ' (you)' : ''}
-      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => (v / 1000).toFixed(1) + 'k').join(' · ')}</span></span><b>${x.t.toLocaleString()}</b></div>`).join('')}</div>`;
+      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => ((+v || 0) / 1000).toFixed(1) + 'k').join(' · ')}</span></span><b>${x.t.toLocaleString()}</b></div>`).join('')}</div>`;
 }
 function renderBanner() {
   const b = $('#chalBanner');
@@ -713,10 +729,10 @@ function renderBanner() {
       <button class="primary" id="hJoinInv">Join</button></div>`;
     $('#hJoinInv').onclick = needKey(() => joinRoom(pendingRoom));
   } else if (pendingChal) {
-    const sc = (pendingChal.s || []).map(([n, p]) => [n, p.reduce((a, x) => a + x, 0)]).sort((a, c) => c[1] - a[1]);
+    const sc = pendingChal.s.map(([n, p]) => [n, p.reduce((a, x) => a + (+x || 0), 0)]).sort((a, c) => c[1] - a[1]);
     const done = LS.get('gc:c:' + chalId(pendingChal), null);
     b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>⚔ ${sc.length ? esc(sc.map(x => x[0]).join(', ')) + (sc.length === 1 ? ' challenged you' : ' are in this challenge') : 'You have a challenge'}</b>
-      <div class="d">${sc.length ? 'Top score ' + sc[0][1].toLocaleString() + ' · ' : ''}${esc((PACKS[pendingChal.p] || PACKS.world).name)} · ${MOVES[pendingChal.m] || 'Moving'}${pendingChal.t ? ' · ' + pendingChal.t + 's' : ''}</div></div>
+      <div class="d">${sc.length ? 'Top score ' + sc[0][1].toLocaleString() + ' · ' : ''}${esc(PACKS[pendingChal.p].name)} · ${MOVES[pendingChal.m]}${pendingChal.t ? ' · ' + pendingChal.t + 's' : ''}</div></div>
       <button class="primary" id="hChal">${done ? (done.phase === 'final' ? 'Results' : 'Continue') : 'Accept'}</button></div>`;
     $('#hChal').onclick = needKey(() => startChallenge(pendingChal));
   } else b.innerHTML = '';
@@ -761,7 +777,7 @@ function goPage(url) { location.replace(url); }
 // a room made for another game: hand over to that game's page (returns true if redirected)
 function otherGame(room, code) {
   const g = (room && room.settings && room.settings.game) || 'geo';
-  if (g === 'geo' || !GAME_PAGES[g]) return false;
+  if (g === 'geo' || !has(GAME_PAGES, g)) return false;
   goPage(GAME_PAGES[g] + '?room=' + code); return true;
 }
 function joinRoom(code) {
@@ -769,7 +785,7 @@ function joinRoom(code) {
   if (code.length < 4) { toast('Enter the 4-letter room code'); return; }
   askName(async () => {
     live = { code };
-    let jr; try { jr = await api('join'); } catch (e) { live = null; apiError(e); return; }
+    let jr; try { jr = await api('join', { game: 'geo' }); } catch (e) { live = null; apiError(e); return; }
     if (otherGame({ settings: { game: jr && jr.game } }, code)) return;
     hideHome();
     if (!(await boot())) return;
@@ -796,7 +812,7 @@ function roundOver(d) {
   return !!room.settings.timer && d.now - room.startedAt > room.settings.timer * 1000 + 3000;
 }
 function setupLiveGame(room) {
-  game = { mode: 'live', key: 'live', code: room.code, pack: PACKS[room.settings.pack] ? room.settings.pack : 'world', move: room.settings.move, timer: room.settings.timer,
+  game = { mode: 'live', key: 'live', code: room.code, pack: has(PACKS, room.settings.pack) ? room.settings.pack : 'world', move: has(MOVES, room.settings.move) ? room.settings.move : 'move', timer: room.settings.timer,
     rounds: room.rounds.map(r => Object.assign({}, r, { guess: null, km: null, pts: null })), idx: room.round, phase: 'play' };
   live.round = -1;
 }
@@ -927,8 +943,8 @@ function renderLobby(d) {
     ${host ? `<div class="grid2" style="text-align:left;margin:0 0 6px">
         <div><div class="help">Movement</div><select id="lbMove">${opt(Object.entries(MOVES), room.settings.move)}</select></div>
         <div><div class="help">Round timer</div><select id="lbTimer">${opt(LIVE_TIMERS.map(t => [t, timerName(t)]), room.settings.timer)}</select></div></div>
-      <p class="help">Map: ${esc((PACKS[room.settings.pack] || PACKS.world).name)} · 5 rounds</p>`
-    : `<p class="help">${esc((PACKS[room.settings.pack] || PACKS.world).name)} · ${MOVES[room.settings.move] || 'Moving'} · ⏱ ${room.settings.timer ? timerName(room.settings.timer) + ' per round' : 'no timer'} · 5 rounds</p>`}
+      <p class="help">Map: ${esc((has(PACKS, room.settings.pack) ? PACKS[room.settings.pack] : PACKS.world).name)} · 5 rounds</p>`
+    : `<p class="help">${esc((has(PACKS, room.settings.pack) ? PACKS[room.settings.pack] : PACKS.world).name)} · ${has(MOVES, room.settings.move) ? MOVES[room.settings.move] : 'Moving'} · ⏱ ${room.settings.timer ? timerName(room.settings.timer) + ' per round' : 'no timer'} · 5 rounds</p>`}
     <div class="hbtns">${host ? `<button class="primary" id="lbStart">Start game · ${ids.length} player${ids.length > 1 ? 's' : ''}</button>` : '<button disabled>Waiting for the host to start…</button>'}
       <button id="lbLeave">Leave room</button></div>`;
   $('#lobby').classList.add('on');

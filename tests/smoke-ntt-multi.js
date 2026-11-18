@@ -37,12 +37,12 @@ function browser(name,opts={}){
  class SVS{async getPanorama(r){
   if(r.pano){const l=panoLocs[r.pano];if(!l)throw new Error('ZERO_RESULTS');return{data:{location:{pano:r.pano,latLng:new LL(l.lat,l.lng),description:'X'}}}}
   const id='P'+(++panoN);panoLocs[id]={lat:r.location.lat,lng:r.location.lng};return{data:{location:{pano:id,latLng:new LL(r.location.lat,r.location.lng),description:'X'}}}}}
- w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g'}},marker:{Marker}})[k]}};
+ w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g',OUTDOOR:'o'}},marker:{Marker}})[k]}};
  w.fetch=async(u,o)=>{u=String(u);
   if(u.includes('api/usage')){if(o&&o.method==='POST')st.posts++;return{ok:false,status:503,json:async()=>({error:'nodb'})};}
   if(u.includes('api/config'))return{ok:true,status:200,json:async()=>({googleMapsKey:''})};
   const {status,j}=await callApi(JSON.parse(o.body));return{ok:status<300,status,json:async()=>j};};
- w.eval(src+';window.__t={g:()=>game,TEAM,distKm,poll:pollRoom,live:()=>live,b64d,pano:()=>pano,selectTeam,makeGuess};');
+ w.eval(src+';window.__t={pc:()=>pendingChal,g:()=>game,TEAM,distKm,poll:pollRoom,live:()=>live,b64d,pano:()=>pano,selectTeam,makeGuess};');
  const d=w.document;
  return {w,d,st,
   async ready(){await sleep(20);if(w.__gcReady)await w.__gcReady();await sleep(80);},
@@ -150,9 +150,11 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   const G=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?room='+code});await sleep(60);
   G.d.querySelector('#hJoinInv').click();await sleep(200);
   check('geo code redirects: geo room -> geo-clue.html?room=CODE',G.w.__went==='geo-clue.html?room='+code&&!G.w.__t.g());
+  check('joining a geo room from this page leaves no ghost player',Object.keys(db.get('gc:room:'+code+':p')||{}).join()==='h');
   const ntt=(await callApi({action:'create',id:'h',name:'H',settings:{game:'ntt'},rounds:Array.from({length:5},()=>({pano:'X',heading:0,lat:1,lng:2,ans:'SEA'}))})).j.code;
   const N=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?room='+ntt});await sleep(60);N.d.querySelector('#hJoinInv').click();await sleep(50);await N.ready();await sleep(50);
   check('ntt room is not redirected',N.w.__went===undefined&&on(N.d,'#lobby'));
+  check('ntt room joined in one step (one Join click)',Object.keys(db.get('gc:room:'+ntt+':p')||{}).length===2);
   const b64=o=>Buffer.from(JSON.stringify(o)).toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
   const geoLink=b64({v:1,p:'world',m:'move',t:0,r:[['a',0,'r'],['b',0,'r'],['c',0,'r'],['d',0,'r'],['e',0,'r']],s:[]});
   const L=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+geoLink});await sleep(30);
@@ -172,6 +174,13 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
    const mb=txt(M.d.querySelector('#chalBanner'));
    if(!(on(M.d,'#home')&&txt(M.d.querySelector('#todayCard')).length&&mb.includes('You have a challenge')&&M.d.querySelector('#hMove').options.length===3))badS.push(JSON.stringify(s));
   }
+  const T5=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'constructor',t:99999,r:R5,s:[]})});await sleep(30);
+  check('ntt link: t clamped to 600, unknown move falls back to Moving',!!T5.w.__t.pc()&&T5.w.__t.pc().t===600&&T5.w.__t.pc().m==='move'&&/Moving/.test(txt(T5.d.querySelector('#chalBanner'))));
+  for(const id of ['constructor','__proto__','toString']){
+   const Y=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:[...R5.slice(0,4),['P5',0,id]],s:[]})});await sleep(30);
+   check(`ntt link with team "${id}" is broken`,Y.w.__t.pc()===null&&txt(Y.d.querySelector('#chalBanner'))==='');}
+  const Z=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'constructor',r:R5,s:[]})});await sleep(30);
+  check('ntt page: link with g "constructor" is broken, not redirected',Z.w.__went===undefined&&Z.w.__t.pc()===null);
   check('malformed scores (5, [null], bad entries, string): home still renders, banner shown'+(badS.length?' — broke on '+badS.join(' '):''),!badS.length);}
 
  console.log(bad?`${bad} FAILED`:'ALL PASS');

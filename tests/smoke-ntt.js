@@ -16,9 +16,9 @@ function browser(opts={}){
  class O{constructor(o){this.o=o||{};this.ls={}}addListener(e,f){this.ls[e]=f}setMap(m){this.m=m}getMap(){return this.m}}
  class Marker extends O{constructor(o){super(o);this.m=o.map;this.p=o.position}setPosition(p){this.p=p}getPosition(){return new LL(this.p.lat,this.p.lng)}}
  class Map extends O{setCenter(){}setZoom(){}fitBounds(){}}
- class Pano extends O{constructor(e,o){super(o);st.panos++;this.pano=o.pano}setOptions(o){this.pano=o.pano}getPano(){return this.pano}setPano(p){this.pano=p}setPov(){}setZoom(){}}
+ class Pano extends O{constructor(e,o){super(o);st.panos++;this.pano=o.pano}setOptions(o){this.o=o;this.pano=o.pano}getPano(){return this.pano}setPano(p){this.pano=p}setPov(){}setZoom(){}}
  let n=0;class SVS{async getPanorama(r){st.reqs.push(r);if(!r.sources||r.sources[0]!=='g')throw new Error('not google-only');const id='P'+(++n);return{data:{location:{pano:id,latLng:new LL(r.location.lat,r.location.lng),description:'X'}}}}}
- w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g'}},marker:{Marker}})[k]}};
+ w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g',OUTDOOR:'o'}},marker:{Marker}})[k]}};
  w.fetch=async(u,o)=>{u=String(u);
   if(u.includes('api/usage')){if(st.shared==null)return{ok:false,status:503,json:async()=>({error:'nodb'})};if(o&&o.method==='POST'){st.posts++;st.shared++;}return{ok:true,status:200,json:async()=>({month:thisMonth(),panos:st.shared,free:5000})};}
   if(u.includes('api/config'))return{ok:true,status:200,json:async()=>({googleMapsKey:''})};
@@ -47,6 +47,7 @@ const full=t=>t.city+' '+t.name;
  console.log('      daily teams:',ansA.join(' '));
  check('daily same for two browsers',ansA.length===5&&ansA.join()===ansB.join()&&new Set(ansA).size===5);
  check('Google loaded once a game starts, picker shown, map hidden',A.googleLoaded()&&!A.d.querySelector('#picker').hidden&&!on(A.d,'#mapBox'));
+ check('every lookup asks for Google-owned AND outdoor panos (sources intersect)',A.st.reqs.every(r=>r.sources.length===2&&r.sources.includes('g')&&r.sources.includes('o')));
  check('every lookup asks for Google-owned panos, radius 2000',A.st.reqs.length>0&&A.st.reqs.every(r=>r.sources&&r.sources[0]==='g'&&r.radius===2000&&r.preference==='nearest'));
 
  // ===== ntt fairness =====
@@ -111,6 +112,7 @@ const full=t=>t.city+' '+t.name;
   const g=H.w.__t.g(),po=H.w.__t.pano().o;
   check('hard locks view: game.hard, NMPZ, 25s timer, #block on, no links/clickToGo',g.hard===true&&g.move==='nmpz'&&g.timer===25&&on(H.d,'#block')&&po.linksControl===false&&po.clickToGo===false&&H.d.querySelector('#timer').textContent==='⏱ 25s');
   H.w.__t.selectTeam(g.rounds[0].ans);H.w.__t.makeGuess(true);
+  check('hard round shows the pano zoomed in (zoom 1)',po.zoom===1);
   check('hard timeout scores 0 even with a team highlighted',g.rounds[0].pts===0&&g.phase==='result'&&!on(H.d,'#block'));
   H.d.querySelector('#nextBtn').click();
   H.w.__t.selectTeam(g.rounds[1].ans);H.d.querySelector('#guessBtn').click();
@@ -122,6 +124,8 @@ const full=t=>t.city+' '+t.name;
   // daily ignores hard
   const Dd=browser({shared:10,nt:{hard:true}});await sleep(40);Dd.d.querySelector('#hDaily').click();await Dd.ready();
   const gd=Dd.w.__t.g(),pd=Dd.w.__t.pano().o;
+  check('normal round keeps zoom 0',pd.zoom===0);
+  check('hard lookups are outdoor-only too',A.st.reqs.filter(r=>r.radius===150).every(r=>r.sources.includes('o')));
   check('daily ignores hard: normal mode, moving, no timer, no block',gd.mode==='daily'&&gd.hard===false&&gd.move==='move'&&gd.timer===0&&!on(Dd.d,'#block')&&pd.clickToGo===true&&Dd.d.querySelector('#timer').hidden&&Dd.st.reqs.every(r=>r.radius===2000));}
 
  // ===== one bad team does not sink the game =====

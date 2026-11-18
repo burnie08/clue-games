@@ -353,15 +353,15 @@ function nearestTeam(p) {
   for (const t of TEAMS) { const km = distKm(p, t); if (km < bestKm) { bestKm = km; best = t.code; } }
   return best;
 }
-// A random Google-owned pano within ~10 miles of the team's arena, and closer to it than to any other
+// A random Google-owned outdoor pano within ~10 miles of the team's arena, and closer to it than to any other
 // team's arena (so New York / New Jersey and LA / Anaheim spots are never a coin flip).
-// Hard mode: a pano within 300 m of the arena, facing directly away from it (140-180 degrees off the arena's direction).
+// Hard mode: a pano within 300 m of the arena (outdoor only, so never inside it), facing directly away from it (140-180 degrees off the arena's direction).
 async function findTeamSpot(rng, team, hard) {
   if (typeof team === 'string') team = TEAM[team];
   for (let i = 0; i < 30; i++) {
     const location = offsetPoint(team, (hard ? HARD_START_KM : SPOT_KM) * Math.sqrt(rng()), rng() * 360);
     try {
-      const { data } = await sv.getPanorama({ location, radius: hard ? 150 : 2000, preference: 'nearest', sources: [G.StreetViewSource.GOOGLE] });
+      const { data } = await sv.getPanorama({ location, radius: hard ? 150 : 2000, preference: 'nearest', sources: [G.StreetViewSource.GOOGLE, G.StreetViewSource.OUTDOOR] });   // Google-owned AND outdoor (sources combine as "must match all")
       const loc = data && data.location;
       if (!loc || !loc.pano) continue;
       const spot = { lat: loc.latLng.lat(), lng: loc.latLng.lng() };
@@ -482,6 +482,8 @@ $('#teamFilter').onkeydown = e => {   // Enter with one team left picks it; Ente
   else if (chosen) makeGuess(false);
 };
 
+// hard mode starts zoomed in (a narrower view), so a big arena near the edge of the frame is less likely to show
+const roundZoom = () => game.hard ? 1 : 0;
 function showRound() {
   if (overCap()) { showCapMsg(); return; }
   const r = game.rounds[game.idx];
@@ -491,7 +493,7 @@ function showRound() {
   $('#picker').hidden = false; $('#picker').classList.remove('open'); $('#pickToggle').hidden = false;
   $('#teamFilter').value = ''; applyFilter(); selectTeam(null);
   const nm = game.move !== 'move', nmpz = game.move === 'nmpz';
-  const opts = { pano: r.pano, pov: { heading: r.heading, pitch: 0 }, zoom: 0, visible: true,
+  const opts = { pano: r.pano, pov: { heading: r.heading, pitch: 0 }, zoom: roundZoom(), visible: true,
     addressControl: false, showRoadLabels: false, fullscreenControl: false, motionTracking: false, motionTrackingControl: false, enableCloseButton: false,
     linksControl: !nm, clickToGo: !nm, scrollwheel: !nmpz, zoomControl: !nmpz, panControl: true };
   if (!pano) {
@@ -592,7 +594,7 @@ async function copy(t) {
 // ---------- buttons ----------
 $('#guessBtn').onclick = () => makeGuess(false);
 $('#pickToggle').onclick = () => $('#picker').classList.toggle('open');
-$('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(0); } };
+$('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(roundZoom()); } };
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || (e.target.dataset && e.target.dataset.team) || homeOn() || $('#endS').classList.contains('on') || !$('#modal').hidden) return;
   if ((e.key === ' ' || e.key === 'Enter') && game) {
@@ -732,6 +734,8 @@ $('#hSet').onclick = () => openSettings(!settings.key);
 const COLORS = ['#e4b343', '#4fa3ff', '#ff6b9a', '#7ddc6f', '#c38bff', '#ff8f4f', '#4fe0d2', '#f5f56b', '#ff5c5c', '#a0a0ff'];
 // rooms and links are shared between the games: one made for another game is handed to that game's page
 const GAME_PAGES = { geo: 'geo-clue.html', ntt: 'name-that-team.html', hh: 'hometown-heroes.html' };
+// lookups by a key that came from a link or a room: Object.hasOwn so names like "constructor" don't count
+const has = (o, k) => Object.hasOwn(o, k);
 function goPage(url) { location.replace(url); }
 function askName(cb) {
   if (settings.name) return cb(settings.name);
@@ -741,7 +745,7 @@ function askName(cb) {
   const go = () => { const v = $('#nmIn').value.trim(); if (!v) { toast('Enter a name'); return; } settings.name = v; saveSettings(); closeModal(); cb(v); };
   $('#nmOk').onclick = go; $('#nmIn').onkeydown = e => { if (e.key === 'Enter') go(); }; $('#nmIn').focus();
 }
-const ruleLabel = (hard, move, timer) => hard ? `Hard · NMPZ · ⏱ ${HARD_TIMER}s` : `${MOVES[move] || 'Moving'}${timer ? ' · ⏱ ' + timerName(timer) : ''}`;
+const ruleLabel = (hard, move, timer) => hard ? `Hard · NMPZ · ⏱ ${HARD_TIMER}s` : `${has(MOVES, move) ? MOVES[move] : 'Moving'}${timer ? ' · ⏱ ' + timerName(timer) : ''}`;
 
 // ---------- challenge links: ?c=<base64url JSON> {v:1, g:'ntt', h:0|1, m, t, r:[[pano, heading, ans]×5], s:[[name,[pts×5]],…]} ----------
 function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
@@ -755,8 +759,10 @@ function readUrl() {
       const ch = b64d(c);
       if (!ch || !Array.isArray(ch.r) || ch.r.length !== ROUNDS) throw 0;
       const g = ch.g || 'geo';   // links without a game are Geo Clue links
-      if (g !== 'ntt') { if (!GAME_PAGES[g]) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
-      if (!ch.r.every(x => Array.isArray(x) && TEAM[x[2]])) throw 0;
+      if (g !== 'ntt') { if (!has(GAME_PAGES, g)) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
+      if (!ch.r.every(x => Array.isArray(x) && typeof x[0] === 'string' && has(TEAM, x[2]))) throw 0;   // unknown team = broken link
+      ch.m = has(MOVES, ch.m) ? ch.m : 'move';
+      ch.t = Math.max(0, Math.min(600, Math.round(+ch.t || 0)));
       // scores come from whoever made the link: keep only [name, 5 numbers 0-5000] entries
       ch.s = (Array.isArray(ch.s) ? ch.s : []).filter(x => Array.isArray(x) && Array.isArray(x[1]) && x[1].length === ROUNDS)
         .map(([n, p]) => [String(n).slice(0, 24), p.map(v => Math.max(0, Math.min(5000, Math.round(+v || 0))))]);
@@ -790,7 +796,7 @@ async function startChallenge(ch) {
   const cid = chalId(ch), saved = LS.get('nt:c:' + cid, null);
   if (capBlocks(saved)) { showCapMsg(); return; }
   if (!(await boot())) return;
-  if (saved) { game = saved; game.chal = { s: Array.isArray(ch.s) ? ch.s : [] }; save(); return resume(); }
+  if (saved) { game = saved; game.chal = { s: ch.s }; save(); return resume(); }
   showMsg('Loading the challenge…');
   const rounds = [];
   try {
@@ -800,12 +806,12 @@ async function startChallenge(ch) {
     }
   } catch (e) { showMsg('Couldn\'t load one of the challenge spots. The link may be broken or the imagery was removed.'); return; }
   const hard = ch.h === 1;
-  game = { mode: 'chal', key: 'chal', cid, hard, move: hard ? 'nmpz' : MOVES[ch.m] ? ch.m : 'move', timer: hard ? HARD_TIMER : +ch.t || 0,
-    rounds, idx: 0, phase: 'play', chal: { s: Array.isArray(ch.s) ? ch.s : [] } };
+  game = { mode: 'chal', key: 'chal', cid, hard, move: hard ? 'nmpz' : ch.m, timer: hard ? HARD_TIMER : ch.t,   // m and t cleaned in readUrl
+    rounds, idx: 0, phase: 'play', chal: { s: ch.s } };
   save(); resume();
 }
 function chalBoard() {
-  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + x, 0) })).sort((a, b) => b.t - a.t);
+  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + (+x || 0), 0) })).sort((a, b) => b.t - a.t);
   return `<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">⚔ Challenge leaderboard</div>
     <div class="rounds">${rows.map((x, i) => `<div><span>${i === 0 ? '🏆' : (i + 1) + '.'} ${esc(x.n)}${x.n === myName() ? ' (you)' : ''}
       <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => v ? '✓' : '✗').join('')}</span></span><b>${(+x.t || 0).toLocaleString()}</b></div>`).join('')}</div>`;
@@ -865,7 +871,7 @@ function createRoom() {
 function otherGame(g, code) {
   g = g || 'geo';
   if (g === 'ntt') return false;
-  goPage((GAME_PAGES[g] || GAME_PAGES.geo) + '?room=' + code); return true;
+  goPage((has(GAME_PAGES, g) ? GAME_PAGES[g] : GAME_PAGES.geo) + '?room=' + code); return true;
 }
 function joinRoom(code) {
   code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -873,7 +879,7 @@ function joinRoom(code) {
   askName(async () => {
     if (overCap()) { hideHome(); showCapMsg(); return; }
     live = { code };
-    let jr; try { jr = await api('join'); } catch (e) { live = null; apiError(e); return; }
+    let jr; try { jr = await api('join', { game: 'ntt' }); } catch (e) { live = null; apiError(e); return; }
     if (otherGame(jr && jr.game, code)) return;
     hideHome();
     if (!(await boot())) return;
@@ -966,7 +972,7 @@ function showLiveResult(d) {
   const R = game.rounds[r], t = TEAM[R.ans];
   hudLive(d); revealMap(R);
   const rows = playerRows(d, r).sort((a, c) => ((c.g || {}).pts || 0) - ((a.g || {}).pts || 0));
-  const pickName = g => g && g.pick && TEAM[g.pick] ? esc(fullName(TEAM[g.pick])) : 'no pick';
+  const pickName = g => g && g.pick && has(TEAM, g.pick) ? esc(fullName(TEAM[g.pick])) : 'no pick';
   const last = r >= ROUNDS - 1;
   $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Round ${r + 1} of ${ROUNDS} · Room ${esc(room.code)}</div>
     <h2>It was the ${esc(fullName(t))}</h2>
@@ -991,7 +997,7 @@ function showLiveFinal(d) {
     <div class="endbox"><div class="rounds">${st.map((x, i) => `<div><span>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} <span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}
       <span style="color:var(--muted);font-size:12px"> ${x.per.map(v => v ? '✓' : '✗').join('')}</span></span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div></div>
     <div class="endbox"><div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(fullName(TEAM[r.ans]))}</a></span>
-      <span>${r.pts > 0 ? '✓' : r.pick && TEAM[r.pick] ? 'you: ' + esc(TEAM[r.pick].name) : 'no pick'}</span></div>`).join('')}</div></div>
+      <span>${r.pts > 0 ? '✓' : r.pick && has(TEAM, r.pick) ? 'you: ' + esc(TEAM[r.pick].name) : 'no pick'}</span></div>`).join('')}</div></div>
     <div class="hbtns"><button class="primary" id="liveCopy">Copy results</button><button id="liveHome">⌂ Back to home</button></div>`;
   $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
   $('#liveCopy').onclick = () => copy(`Name That Team live room ${d.room.code}\n` + st.map((x, i) => `${i + 1}. ${x.name} — ${x.tot.toLocaleString()}`).join('\n'));
