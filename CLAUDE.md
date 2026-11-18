@@ -15,7 +15,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 | `reel-clue.html` | **Reel Clue**: Spotle-style movie guessing (10 guesses, 8 clue tiles). Data: TMDB API |
 | `tune-clue.html` | **Tune Clue**: Heardle-style song guessing (6 tries, growing clips). Data: iTunes Search API (30s previews) |
 | `geo-clue.html` | **Geo Clue**: GeoGuessr-style Street View guessing, with challenge links + live rooms. Data: Google Maps JS API |
-| `world-clue.html` | **World Clue**: geography puzzles. Built so far: **Flag** (hidden flag under 6 tiles, 6 guesses, distance + arrow + closeness %), daily + unlimited. Planned: Country, Shape, Border Hop (greyed "soon" buttons on its home). Data: built-in country list (code, name, rough center lat/lng); flag images from flagcdn.com, no key |
+| `world-clue.html` | **World Clue**: geography puzzles. Puzzles picked with tabs on its home (`P` = `flag` or `country`, settings in `PUZ`). **Flag**: hidden flag under 6 tiles, 6 guesses, distance + arrow + closeness %. **Country**: 8 guesses, 6 clue tiles (region, people, size, languages, coast, distance). Each has daily + unlimited. Planned: Shape, Border Hop (greyed "soon"). Data: built-in `COUNTRIES` (code, name, rough center) + `FACTS` (population from World Bank 2023, area/region/languages/capital/landlocked from mledoze/countries), baked in so nothing to fetch; flag images from flagcdn.com, no key |
 | `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so Geo Clue works on every device |
 | `api/room.js` | Vercel function: Geo Clue live rooms, stored in Upstash Redis |
 | `api/usage.js` | Vercel function: shared monthly Street View counter for all players (Redis key `gc:usage:YYYY-MM`, UTC month) |
@@ -27,7 +27,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
   - `#home` screen (today's status, play buttons, stats) → game → `#endS` end-of-game summary → back to home.
   - Top bar during play: ⌂ Home · Stats · ? · ⚙.
 - Daily puzzles are picked with a **seeded shuffle** (`mulberry32`) keyed by the local date, so everyone gets the same answer each day. Changing a song list, film pool, or seed changes which answer each day gets.
-- Saved data lives in the browser's `localStorage` (per device). Key prefixes: `rc:` Reel, `tc:` Tune, `gc:` Geo, `wc:` World (`wc:flag:g:DATE`, `wc:flag:stats`, `wc:flag:unl`, `wc:flag:ustats`).
+- Saved data lives in the browser's `localStorage` (per device). Key prefixes: `rc:` Reel, `tc:` Tune, `gc:` Geo, `wc:` World (`wc:<puzzle>:g:DATE`, `:stats`, `:unl`, `:ustats`, plus `wc:puz` = last tab).
 
 ## Keys & environment variables (Vercel → clue-games → Settings → Environment Variables)
 | Variable | Used by | Notes |

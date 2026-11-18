@@ -98,5 +98,17 @@ async function world(){
  const first=u.answer; d.querySelector('#eNext').click(); await sleep(50);
  console.log('      next flag -> new answer',w.__t.g().answer!==first,'| guesses',w.__t.g().guesses.length);
  d.querySelector('#bHome').click(); console.log('      home unlimited stats:',d.querySelector('#hUStatsRow').textContent.replace(/\s+/g,' ').trim());
+ // ---- Country puzzle ----
+ d.querySelector('#hPuzzles button[data-p=country]').click();
+ console.log('WORLD country tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| btns:',d.querySelector('#hDaily').textContent,'/',d.querySelector('#hUnl').textContent);
+ d.querySelector('#hDaily').click(); await sleep(50);
+ const ca=w.__t.g().answer; console.log('      playing: answer',ca,'| flagbox hidden',d.querySelector('#flagbox').hidden,'| max',d.querySelector('#maxG').textContent,'| flag answer differs',ca!==ans);
+ const cw=['fr','jp'].filter(c=>c!==ca); w.__t.guess(cw[0]);
+ console.log('      row:',[...d.querySelectorAll('.crow .tile')].map(t=>t.className.split(' ')[1]+':'+t.textContent.replace(/\s+/g,' ').trim()).join(' | '));
+ w.__t.guess(ca); await sleep(1400);
+ console.log('      win -> end',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'|',d.querySelector('#endBody .tag:nth-of-type(3)')?.textContent||[...d.querySelectorAll('#endBody .tag')].map(t=>t.textContent).join(' // '));
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      share:',JSON.stringify(w.__copied));
+ d.querySelector('#eHome').click(); console.log('      home country stats:',d.querySelector('#hStatsRow').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#hPuzzles button[data-p=flag]').click(); console.log('      back to flag tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '));
 }
 (async()=>{await reel();await tune();await geo();await geoNoDb();await world();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
