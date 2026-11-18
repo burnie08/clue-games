@@ -187,6 +187,19 @@ const R_ASIA = [['Japan', 33, 43.5, 130.5, 145, 2], ['South Korea', 34.5, 38, 12
 const R_AFRICA = [['South Africa', -34.5, -23, 18, 32, 1.5], ['Kenya', -4.5, 1, 34, 41, 0.5], ['Nigeria', 5, 13, 3, 14, 0.5], ['Ghana', 5, 11, -3, 1, 0.4], ['Senegal', 12.5, 16.5, -17.5, -11.5, 0.3],
   ['Botswana', -26, -18, 20, 29, 0.3], ['Uganda', -1.5, 4, 29.5, 35, 0.3], ['Tunisia', 33, 37.3, 8, 11, 0.3]];
 const R_OCEANIA = [['Australia (East)', -38.5, -17, 140, 153.5, 2], ['Australia (West)', -35, -30, 115, 121, 0.5], ['New Zealand', -46.5, -34.5, 166.5, 178.5, 0.8]];
+// Washington State: west side (Seattle, Puget Sound, coast) gets more weight than the drier east.
+const R_WA = [['Puget Sound', 46.8, 48.95, -123.2, -121.8, 3], ['Western Washington', 45.6, 48.95, -124.7, -121.3, 2], ['Eastern Washington', 45.95, 48.95, -121.3, -117.05, 2.5]];
+// Rough outline of Washington [lng, lat]. Places outside it (Oregon, Idaho, Canada) are skipped.
+const WA_SHAPE = [[-124.8, 48.45], [-123.25, 48.25], [-123.25, 48.75], [-123.05, 49.0], [-117.03, 49.0], [-117.03, 46.42], [-116.92, 46.0], [-118.98, 46.0],
+  [-119.3, 45.93], [-120.9, 45.65], [-121.5, 45.7], [-122.3, 45.55], [-122.76, 45.62], [-122.9, 46.1], [-123.5, 46.25], [-124.1, 46.25], [-124.2, 46.9], [-124.7, 47.9]];
+function inShape(shape, lat, lng) {
+  let inside = false;
+  for (let i = 0, j = shape.length - 1; i < shape.length; j = i++) {
+    const [xi, yi] = shape[i], [xj, yj] = shape[j];
+    if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
 
 const PACKS = {
   world:    { name: 'World',    size: 14917, center: { lat: 20, lng: 0 },   zoom: 1, regions: [...R_USA, ...R_AMERICAS_OTHER, ...R_EUROPE, ...R_ASIA, ...R_AFRICA, ...R_OCEANIA] },
@@ -194,7 +207,8 @@ const PACKS = {
   americas: { name: 'Americas', size: 12000, center: { lat: 5, lng: -80 },  zoom: 2, regions: [...R_USA, ...R_AMERICAS_OTHER] },
   europe:   { name: 'Europe',   size: 4500,  center: { lat: 52, lng: 15 },  zoom: 3, regions: R_EUROPE },
   asia:     { name: 'Asia',     size: 9000,  center: { lat: 25, lng: 100 }, zoom: 2, regions: R_ASIA },
-  oceania:  { name: 'Australia & NZ', size: 5000, center: { lat: -30, lng: 150 }, zoom: 3, regions: R_OCEANIA }
+  oceania:  { name: 'Australia & NZ', size: 5000, center: { lat: -30, lng: 150 }, zoom: 3, regions: R_OCEANIA },
+  wa:       { name: 'Washington State', size: 700, center: { lat: 47.3, lng: -120.6 }, zoom: 6, regions: R_WA, radius: 15000, shape: WA_SHAPE }
 };
 const MOVES = { move: 'Moving', nomove: 'No move', nmpz: 'NMPZ' };
 const ROUNDS = 5;
@@ -441,14 +455,16 @@ function initMap() {
 // ---------- finding locations (metadata lookups are free) ----------
 function weightedPick(list, rng) { const tot = list.reduce((a, r) => a + r[5], 0); let x = rng() * tot; for (const r of list) { x -= r[5]; if (x <= 0) return r; } return list[list.length - 1]; }
 async function findLocation(rng, pack) {
-  for (let i = 0; i < 30; i++) {
-    const r = weightedPick(PACKS[pack].regions, rng);
+  const P = PACKS[pack];
+  for (let i = 0; i < (P.shape ? 60 : 30); i++) {
+    const r = weightedPick(P.regions, rng);
     const location = { lat: r[1] + rng() * (r[2] - r[1]), lng: r[3] + rng() * (r[4] - r[3]) };
-    const req = { location, radius: 50000, preference: 'nearest' };
+    if (P.shape && !inShape(P.shape, location.lat, location.lng)) continue;   // free skip: point is outside the state
+    const req = { location, radius: P.radius || 50000, preference: 'nearest' };
     if (G.StreetViewSource && G.StreetViewSource.GOOGLE) req.sources = [G.StreetViewSource.GOOGLE]; else req.source = 'outdoor';
     try {
       const { data } = await sv.getPanorama(req);
-      if (data && data.location && data.location.pano) {
+      if (data && data.location && data.location.pano && (!P.shape || inShape(P.shape, data.location.latLng.lat(), data.location.latLng.lng()))) {
         return { pano: data.location.pano, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(), desc: data.location.description || '', region: r[0], heading: Math.round(rng() * 360), guess: null, km: null, pts: null };
       }
     } catch (e) { /* no coverage near this point — try another */ }
