@@ -102,6 +102,8 @@ nav button.on{background:var(--accent);color:#1a1300}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
 .grid3 select{padding:8px;font-size:14px}
 .logo{cursor:pointer}
+.rcode{font-size:60px;font-weight:800;letter-spacing:12px;color:var(--accent);line-height:1.1}
+#hCode{text-transform:uppercase;letter-spacing:3px}
 </style>
 </head>
 <body>
@@ -138,6 +140,7 @@ nav button.on{background:var(--accent);color:#1a1300}
   <div class="hicon">🌍</div>
   <div class="hlogo">Geo<span>Clue</span></div>
   <p class="tag">You're dropped somewhere in Street View. Look for clues, then pin where you think you are. 5 rounds, up to 5,000 points each.</p>
+  <div id="chalBanner"></div>
   <div class="today" id="todayCard"></div>
   <div class="hbtns"><button class="primary" id="hDaily">Play today's 5 locations</button></div>
   <div class="opts">
@@ -145,11 +148,18 @@ nav button.on{background:var(--accent);color:#1a1300}
     <div class="grid3"><select id="hPack" title="Map"></select><select id="hMove" title="Movement"></select><select id="hTimer" title="Round timer"></select></div>
     <button id="hUnl" style="width:100%;margin-top:8px">Play Unlimited</button>
   </div>
+  <div class="opts">
+    <div class="optsTitle">⚔ Play with friends</div>
+    <button id="hCreate" class="primary" style="width:100%">Create a live room</button>
+    <div style="display:flex;gap:6px;margin-top:8px"><input id="hCode" placeholder="Room code" maxlength="6" autocomplete="off"><button id="hJoin">Join</button></div>
+    <p class="help" style="margin:8px 0 0">Live rooms use the Unlimited map, movement and timer above. You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
+  </div>
   <div id="hStatsRow"></div>
   <p class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></p>
   <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
   <a class="back" href="index.html">← All games</a>
 </div></section>
+<section id="lobby" class="screen"><div class="hwrap" id="lobbyBody"></div></section>
 
 <script>
 // ============================================================
@@ -287,7 +297,15 @@ async function findLocation(rng, pack) {
 // ---------- game ----------
 let game = null, timerId = null;
 const P = () => PACKS[game.pack];
-function save() { LS.set(game.mode === 'daily' ? 'gc:g:' + game.key : 'gc:g:unl', game); }
+function save() {
+  const k = game.mode === 'daily' ? 'gc:g:' + game.key : game.mode === 'chal' ? 'gc:c:' + game.cid : game.mode === 'unl' ? 'gc:g:unl' : null;
+  if (k) LS.set(k, game);
+}
+function modeLabel() {
+  if (game.mode === 'daily') return `Daily · ${niceDate(game.key)}`;
+  const base = `${esc(P().name)} · ${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+  return game.mode === 'chal' ? '⚔ Challenge · ' + base : game.mode === 'live' ? 'Live · ' + base : base;
+}
 
 async function boot() {
   if (!settings.key) { showMsg('Add your Google Maps API key in ⚙ Settings to play.'); openSettings(true); return false; }
@@ -335,7 +353,7 @@ function total() { return game.rounds.reduce((a, r) => a + (r.pts || 0), 0); }
 function hud() {
   $('#hRound').innerHTML = `Round <b>${Math.min(game.idx + 1, ROUNDS)}</b><small>/${ROUNDS}</small>`;
   $('#hScore').innerHTML = `${total().toLocaleString()} <small>pts</small>`;
-  $('#hMode').innerHTML = game.mode === 'daily' ? `Daily · ${niceDate(game.key)}` : `${esc(P().name)} · ${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+  $('#hMode').innerHTML = modeLabel();
 }
 function clearResultLayers() { resultLayers.forEach(l => l.setMap(null)); resultLayers = []; }
 
@@ -366,6 +384,7 @@ function startTimer() {
   const t = $('#timer');
   if (!game.timer) { t.hidden = true; return; }
   let left = game.timer; t.hidden = false;
+  if (game.mode === 'live' && live && live.data) left = Math.max(1, Math.round(game.timer - (Date.now() + live.skew - live.data.room.startedAt) / 1000));
   const draw = () => { t.textContent = `⏱ ${left}s`; t.classList.toggle('low', left <= 10); };
   draw();
   timerId = setInterval(() => { left--; draw(); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
@@ -378,6 +397,7 @@ function makeGuess(timedOut) {
     const p = guessMarker.getPosition(); r.guess = { lat: p.lat(), lng: p.lng() };
     r.km = distKm(r.guess, r); r.pts = scoreFor(r.km, P().size);
   } else { r.guess = null; r.km = null; r.pts = 0; if (timedOut) toast('Time\'s up!'); }
+  if (game.mode === 'live') { game.phase = 'wait'; if (live && live.data) showWaiting(live.data); postLiveGuess(r); return; }
   game.phase = 'result'; save(); showResult();
 }
 function drawRoundOnMap(r, i, bounds) {
@@ -422,19 +442,20 @@ function showFinal() {
   clearResultLayers();
   const b = new G.LatLngBounds(); game.rounds.forEach((r, i) => drawRoundOnMap(r, i, b)); map.fitBounds(b, 60);
   const t = total();
-  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Final score · ${game.mode === 'daily' ? niceDate(game.key) : esc(P().name) + ' · ' + MOVES[game.move]}</div><h2>${t.toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 25,000</span></h2>
+  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Final score · ${modeLabel()}</div><h2>${t.toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 25,000</span></h2>
     <div class="bar"><div style="width:${t / 250}%"></div></div>
     <div class="rounds">${game.rounds.map((r, i) => `<div><span>${i + 1}. <a href="${mapsLink(r)}" target="_blank">${esc(r.region)}</a></span><span>${r.guess ? fmtDist(r.km) : '—'} · <b>${(r.pts || 0).toLocaleString()}</b></span></div>`).join('')}</div>
-    ${game.mode === 'daily' ? statsRow() : ''}
-    <div class="btns"><button class="primary" id="shareBtn">Copy result</button>${game.mode === 'daily' ? '' : '<button id="againBtn">New game →</button>'}<button id="homeBtn">⌂ Back to home</button></div>`;
+    ${game.mode === 'daily' ? statsRow() : ''}${game.mode === 'chal' ? chalBoard() : ''}
+    <div class="btns"><button class="primary" id="shareBtn">Copy result</button><button id="chalBtn">${game.mode === 'chal' ? '⚔ Send results back' : '⚔ Challenge a friend'}</button>${game.mode === 'unl' ? '<button id="againBtn">New game →</button>' : ''}<button id="homeBtn">⌂ Back to home</button></div>`;
   $('#resPanel').classList.add('on');
   $('#shareBtn').onclick = () => copy(shareText());
   if ($('#againBtn')) $('#againBtn').onclick = () => startUnlimited(true);
+  $('#chalBtn').onclick = shareChallenge;
   $('#homeBtn').onclick = showHome;
 }
 function shareText() {
   const sq = p => p >= 4000 ? '🟩' : p >= 2000 ? '🟨' : p >= 500 ? '🟧' : '🟥';
-  const label = game.mode === 'daily' ? game.key : `${P().name} · ${MOVES[game.move]}`;
+  const label = game.mode === 'daily' ? game.key : `${game.mode === 'chal' ? 'Challenge · ' : ''}${P().name} · ${MOVES[game.move]}`;
   return `Geo Clue ${label}\n${total().toLocaleString()} / 25,000\n${game.rounds.map(r => sq(r.pts || 0)).join('')}`;
 }
 async function copy(t) {
@@ -471,6 +492,7 @@ function openSettings(first) {
   ${first ? setupSteps() : ''}
   <label>Google Maps API key</label><input id="sKey" value="${esc(settings.key === serverKey ? '' : settings.key)}" placeholder="${serverKey ? 'Using the key from your Vercel settings ✓' : 'AIza…'}" autocomplete="off">
   <p class="help" style="margin:4px 0 0">Saves as soon as you paste it.</p>
+  <label>Your name (shown in challenges and live rooms)</label><input id="sName" maxlength="24" value="${esc(settings.name || '')}" autocomplete="off">
   <div class="grid2">
     <div><label>Unlimited: map</label><select id="sPack">${Object.entries(PACKS).map(([k, p]) => `<option value="${k}" ${k === settings.pack ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
     <div><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
@@ -490,6 +512,7 @@ function openSettings(first) {
     const newKey = readKey();
     if (!newKey) { toast('Enter an API key'); return; }
     const keyChanged = newKey !== keyAtOpen;
+    settings.name = $('#sName').value.trim();
     Object.assign(settings, { key: newKey, pack: $('#sPack').value, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
     saveSettings(); closeModal();
     if (keyChanged && G) { location.reload(); return; }
@@ -513,6 +536,7 @@ function openHelp() {
   <p>Each round scores up to <b>5,000</b> points. The closer you are, the more you get. 5 rounds per game.</p>
   <p><b>Daily</b>: same 5 world locations for everyone each day, moving allowed, no timer.<br><b>Unlimited</b>: pick a map, movement rule and timer in ⚙.</p>
   <p><b>Moving</b> = walk around · <b>No move</b> = look around only · <b>NMPZ</b> = no moving, panning or zooming.</p>
+  <p><b>⚔ Challenge links</b>: finish any game and send the link. Friends play the same 5 locations whenever they like and see the leaderboard.<br><b>🎮 Live rooms</b>: create a room, share the 4-letter code, and everyone plays the same rounds at the same time with a scoreboard after each round. Up to 10 players.</p>
   <p>Hover the mini-map to make it bigger (tap 🗺 on phones). Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
 }
 function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
@@ -536,7 +560,7 @@ function statsRow() {
   return statsRowHtml([v.length, 'Dailies'], [avg.toLocaleString(), 'Average'], [(v.length ? Math.max(...v) : 0).toLocaleString(), 'Best']);
 }
 function homeOn() { return $('#home').classList.contains('on'); }
-function showHome() { clearInterval(timerId); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function showHome() { clearInterval(timerId); if (live) leaveRoom(); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
 function hideHome() { $('#home').classList.remove('on'); }
 function unlMatches(g) { return g && g.phase !== 'final' && g.pack === settings.pack && g.move === settings.move && g.timer === +settings.timer; }
 function renderHome() {
@@ -547,6 +571,8 @@ function renderHome() {
   else if (g.phase !== 'final') { status = `<b>In progress · round ${g.idx + 1}/5</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
   else { const t = g.rounds.reduce((a, r) => a + (r.pts || 0), 0); status = `<b>${t.toLocaleString()} / 25,000</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = t >= 20000 ? '🏆' : '✅'; label = "See today's result"; }
   $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  renderBanner();
+  if (pendingRoom && !$('#hCode').value) $('#hCode').value = pendingRoom;
   $('#hDaily').textContent = label;
   const fill = (id, entries, val) => { $(id).innerHTML = entries.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join(''); };
   fill('#hPack', Object.entries(PACKS).map(([k, p]) => [k, p.name]), settings.pack);
@@ -568,7 +594,291 @@ $('#hHow').onclick = openHelp;
 $('#hStats').onclick = openStats;
 $('#hSet').onclick = () => openSettings(!settings.key);
 
+// ============================================================
+// PLAY WITH FRIENDS — challenge links (no setup) + live rooms (needs Upstash Redis in Vercel)
+// ============================================================
+const COLORS = ['#e4b343', '#4fa3ff', '#ff6b9a', '#7ddc6f', '#c38bff', '#ff8f4f', '#4fe0d2', '#f5f56b', '#ff5c5c', '#a0a0ff'];
+function askName(cb) {
+  if (settings.name) return cb(settings.name);
+  openModal(`<h2>What's your name?</h2><p class="help">Shown to the people you play against.</p>
+    <input id="nmIn" maxlength="24" placeholder="Your name" autocomplete="off">
+    <div class="btns" style="margin-top:12px;justify-content:flex-start"><button class="primary" id="nmOk">Continue</button></div>`);
+  const go = () => { const v = $('#nmIn').value.trim(); if (!v) { toast('Enter a name'); return; } settings.name = v; saveSettings(); closeModal(); cb(v); };
+  $('#nmOk').onclick = go; $('#nmIn').onkeydown = e => { if (e.key === 'Enter') go(); }; $('#nmIn').focus();
+}
+
+// ---------- challenge links ----------
+function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return JSON.parse(decodeURIComponent(escape(atob(s)))); }
+let pendingChal = null, pendingRoom = null;
+function readUrl() {
+  const p = new URLSearchParams(location.search);
+  try { const c = p.get('c'); if (c) { const ch = b64d(c); if (ch && Array.isArray(ch.r) && ch.r.length === ROUNDS) pendingChal = ch; else throw 0; } }
+  catch (e) { toast('That challenge link looks broken'); }
+  const rm = p.get('room'); if (rm) pendingRoom = rm.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+function chalId(ch) { return hash(ch.r.map(x => x[0]).join('|') + ch.p + ch.m + ch.t).toString(36); }
+function myName() { return settings.name || 'You'; }
+function mergedScores() {
+  const prev = (game.chal && game.chal.s) || [];
+  return [...prev.filter(x => x[0] !== myName()), [myName(), game.rounds.map(r => r.pts || 0)]];
+}
+function shareChallenge() {
+  askName(() => {
+    const ch = { v: 1, p: game.pack, m: game.move, t: game.timer || 0, r: game.rounds.map(r => [r.pano, r.heading, r.region]), s: mergedScores() };
+    const link = location.origin + location.pathname + '?c=' + b64e(ch);
+    // remember my own run under this challenge, so a link sent back opens straight to the leaderboard
+    if (game.mode !== 'chal') LS.set('gc:c:' + chalId(ch), Object.assign({}, game, { mode: 'chal', key: 'chal', cid: chalId(ch), phase: 'final', chal: { s: [] } }));
+    openModal(`<h2>⚔ ${game.mode === 'chal' ? 'Send your results back' : 'Challenge a friend'}</h2>
+      <p class="help">Send this link by text or email. Whoever opens it plays the same 5 locations and sees ${game.mode === 'chal' ? 'everyone\'s scores so far' : 'your score'}. When they finish they can send their results back the same way.</p>
+      <input id="chLink" readonly value="${esc(link)}">
+      <div class="btns" style="margin-top:12px;justify-content:flex-start"><button class="primary" id="chCopy">Copy link</button></div>`);
+    $('#chCopy').onclick = () => copy(link);
+    $('#chLink').onclick = e => e.target.select();
+  });
+}
+async function startChallenge(ch) {
+  hideHome();
+  if (!(await boot())) return;
+  const cid = chalId(ch), saved = LS.get('gc:c:' + cid, null);
+  if (saved) { game = saved; game.chal = { s: Array.isArray(ch.s) ? ch.s : [] }; save(); return resume(); }
+  showMsg('Loading the challenge…');
+  const rounds = [];
+  try {
+    for (const [panoId, heading, region] of ch.r) {
+      const { data } = await sv.getPanorama({ pano: panoId });   // metadata lookup: free
+      rounds.push({ pano: panoId, heading: +heading || 0, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(),
+        desc: data.location.description || '', region: region || 'Location', guess: null, km: null, pts: null });
+    }
+  } catch (e) { showMsg('Couldn\'t load one of the challenge locations. The link may be broken or the imagery was removed.'); return; }
+  game = { mode: 'chal', key: 'chal', cid, pack: PACKS[ch.p] ? ch.p : 'world', move: MOVES[ch.m] ? ch.m : 'move', timer: +ch.t || 0,
+    rounds, idx: 0, phase: 'play', chal: { s: Array.isArray(ch.s) ? ch.s : [] } };
+  save(); resume();
+}
+function chalBoard() {
+  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + x, 0) })).sort((a, b) => b.t - a.t);
+  return `<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">⚔ Challenge leaderboard</div>
+    <div class="rounds">${rows.map((x, i) => `<div><span>${i === 0 ? '🏆' : (i + 1) + '.'} ${esc(x.n)}${x.n === myName() ? ' (you)' : ''}
+      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => (v / 1000).toFixed(1) + 'k').join(' · ')}</span></span><b>${x.t.toLocaleString()}</b></div>`).join('')}</div>`;
+}
+function renderBanner() {
+  const b = $('#chalBanner');
+  if (pendingRoom) {
+    b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>🎮 You're invited to live room ${esc(pendingRoom)}</b><div class="d">Everyone plays the same rounds at the same time</div></div>
+      <button class="primary" id="hJoinInv">Join</button></div>`;
+    $('#hJoinInv').onclick = needKey(() => joinRoom(pendingRoom));
+  } else if (pendingChal) {
+    const sc = (pendingChal.s || []).map(([n, p]) => [n, p.reduce((a, x) => a + x, 0)]).sort((a, c) => c[1] - a[1]);
+    const done = LS.get('gc:c:' + chalId(pendingChal), null);
+    b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>⚔ ${sc.length ? esc(sc.map(x => x[0]).join(', ')) + (sc.length === 1 ? ' challenged you' : ' are in this challenge') : 'You have a challenge'}</b>
+      <div class="d">${sc.length ? 'Top score ' + sc[0][1].toLocaleString() + ' · ' : ''}${esc((PACKS[pendingChal.p] || PACKS.world).name)} · ${MOVES[pendingChal.m] || 'Moving'}${pendingChal.t ? ' · ' + pendingChal.t + 's' : ''}</div></div>
+      <button class="primary" id="hChal">${done ? (done.phase === 'final' ? 'Results' : 'Continue') : 'Accept'}</button></div>`;
+    $('#hChal').onclick = needKey(() => startChallenge(pendingChal));
+  } else b.innerHTML = '';
+}
+
+// ---------- live rooms ----------
+let live = null, pollId = null;
+function sessId() {   // per browser tab, survives reloads; lets two tabs be two players
+  try { let id = sessionStorage.getItem('gc:sid'); if (!id) { id = 's' + Math.random().toString(36).slice(2, 10); sessionStorage.setItem('gc:sid', id); } return id; }
+  catch (e) { return 'x' + hash(navigator.userAgent).toString(36); }
+}
+const NODB_MSG = 'Live rooms need a free database. In Vercel open <b>clue-games → Storage → Create Database → Upstash for Redis</b> (free plan), connect it to this project, then redeploy.';
+async function api(action, extra = {}) {
+  const r = await fetch('api/room', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action, code: live && live.code, id: sessId(), name: settings.name }, extra)) });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (r.status === 503 && j.error === 'nodb') throw new Error('NODB');
+  if (r.status === 404 && !j.error) throw new Error('Live rooms need the hosted site (they don\'t work from a file on your computer).');
+  if (!r.ok) throw new Error(j.error || 'Server error ' + r.status);
+  return j;
+}
+function apiError(e) { if (e.message === 'NODB') openModal(`<h2>Live rooms aren't set up yet</h2><p class="help">${NODB_MSG}</p>`); else toast(e.message); }
+function createRoom() {
+  askName(async () => {
+    hideHome();
+    if (!(await boot())) return;
+    showMsg(`Finding 5 locations in ${esc(PACKS[settings.pack].name)}…`);
+    const rng = mulberry32((Math.random() * 2 ** 32) >>> 0), rounds = [];
+    try { for (let i = 0; i < ROUNDS; i++) rounds.push(await findLocation(rng, settings.pack)); }
+    catch (e) { showMsg(esc(e.message)); return; }
+    try {
+      live = { code: null };
+      const j = await api('create', { settings: { pack: settings.pack, move: settings.move, timer: +settings.timer },
+        rounds: rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, desc: r.desc, region: r.region })) });
+      enterRoom(j.code);
+    } catch (e) { live = null; showHome(); apiError(e); }
+  });
+}
+function joinRoom(code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4) { toast('Enter the 4-letter room code'); return; }
+  askName(async () => {
+    live = { code };
+    try { await api('join'); } catch (e) { live = null; apiError(e); return; }
+    hideHome();
+    if (!(await boot())) return;
+    enterRoom(code);
+  });
+}
+function enterRoom(code) {
+  live = { code, round: -1, data: null, errs: 0, skew: 0, busy: false, resultSig: '', finalShown: false };
+  pendingRoom = null;
+  try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  hideMsg(); pollRoom();
+  clearInterval(pollId); pollId = setInterval(pollRoom, 2000);
+}
+function leaveRoom() {
+  clearInterval(pollId); pollId = null; live = null;
+  $('#lobby').classList.remove('on');
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+}
+const isHost = () => live && live.data && live.data.room.hostId === sessId();
+function roundOver(d) {
+  const room = d.room, r = room.round, ids = Object.keys(d.players);
+  if (room.forceEnd === r) return true;
+  if (ids.length && ids.every(id => d.guesses[r + ':' + id])) return true;
+  return !!room.settings.timer && d.now - room.startedAt > room.settings.timer * 1000 + 3000;
+}
+function setupLiveGame(room) {
+  game = { mode: 'live', key: 'live', code: room.code, pack: PACKS[room.settings.pack] ? room.settings.pack : 'world', move: room.settings.move, timer: room.settings.timer,
+    rounds: room.rounds.map(r => Object.assign({}, r, { guess: null, km: null, pts: null })), idx: room.round, phase: 'play' };
+  live.round = -1;
+}
+function syncMine(d) {
+  game.rounds.forEach((r, i) => { const g = d.guesses[i + ':' + sessId()]; if (g) { r.pts = g.pts; r.km = g.km; r.guess = g.lat == null ? null : { lat: g.lat, lng: g.lng }; } });
+}
+async function pollRoom() {
+  if (!live || live.busy) return;
+  live.busy = true;
+  let d;
+  try { d = await api('get'); live.errs = 0; }
+  catch (e) { if (live && ++live.errs >= 5) { leaveRoom(); showHome(); apiError(e); } return; }
+  finally { if (live) live.busy = false; }
+  if (!live || d.room.code !== live.code) return;
+  live.data = d; live.skew = d.now - Date.now();
+  const room = d.room;
+  if (room.state === 'lobby') return renderLobby(d);
+  $('#lobby').classList.remove('on');
+  if (!game || game.mode !== 'live' || game.code !== room.code) setupLiveGame(room);
+  syncMine(d);
+  if (room.state === 'final') { clearInterval(pollId); return showLiveFinal(d); }
+  const r = room.round;
+  if (live.round !== r) { live.round = r; live.resultSig = ''; game.idx = r; game.phase = d.guesses[r + ':' + sessId()] ? 'wait' : 'play'; showRound(); }
+  if (roundOver(d)) { game.phase = 'result'; showLiveResult(d); }
+  else if (game.phase === 'wait' || d.guesses[r + ':' + sessId()]) { game.phase = 'wait'; showWaiting(d); }
+  else hudLive(d);
+}
+function hudLive(d) {
+  hud();
+  const r = d.room.round, ids = Object.keys(d.players), done = ids.filter(id => d.guesses[r + ':' + id]).length;
+  $('#hMode').innerHTML = `Room <b>${esc(d.room.code)}</b> · ${done}/${ids.length} guessed`;
+}
+async function postLiveGuess(r) {
+  try { await api('guess', { round: game.idx, pts: r.pts || 0, km: r.km, lat: r.guess ? r.guess.lat : null, lng: r.guess ? r.guess.lng : null }); }
+  catch (e) { toast(e.message); }
+  pollRoom();
+}
+function showWaiting(d) {
+  clearInterval(timerId); $('#timer').hidden = true;
+  hudLive(d);
+  const r = d.room.round, ids = Object.keys(d.players), done = ids.filter(id => d.guesses[r + ':' + id]).length;
+  if (guessMarker) guessMarker.setMap(map);
+  $('#guessBtn').disabled = true; $('#guessBtn').textContent = 'Guess locked in ✓';
+  $('#resPanel').innerHTML = `<h2 style="font-size:20px">Guess locked in ✓</h2><div class="dist">Waiting for the others… <b>${done}/${ids.length}</b> guessed</div>
+    ${isHost() ? '<div class="btns"><button id="endRoundBtn">End round now</button></div>' : ''}`;
+  $('#resPanel').classList.add('on');
+  if ($('#endRoundBtn')) $('#endRoundBtn').onclick = () => api('endround').then(pollRoom).catch(apiError);
+}
+function playerRows(d, r) {
+  return Object.keys(d.players).map((id, i) => ({ id, name: d.players[id].name, color: COLORS[i % COLORS.length], g: d.guesses[r + ':' + id] || null, me: id === sessId() }));
+}
+function standings(d, upto) {
+  return Object.keys(d.players).map((id, i) => {
+    let tot = 0; const per = [];
+    for (let k = 0; k <= upto; k++) { const p = (d.guesses[k + ':' + id] || {}).pts || 0; tot += p; per.push(p); }
+    return { id, name: d.players[id].name, color: COLORS[i % COLORS.length], tot, per, me: id === sessId() };
+  }).sort((a, b) => b.tot - a.tot);
+}
+function pin(pos, color, label) {
+  return new G.Marker({ map, position: pos, label: label ? { text: label, color: '#111', fontWeight: '700', fontSize: '11px' } : undefined,
+    icon: { path: G.SymbolPath.CIRCLE, scale: 9, fillColor: color, fillOpacity: 1, strokeColor: '#000', strokeWeight: 1.5 } });
+}
+function showLiveResult(d) {
+  const room = d.room, r = room.round, sig = r + '|' + Object.keys(d.guesses).length + '|' + Object.keys(d.players).length;
+  if (live.resultSig === sig) return;
+  live.resultSig = sig;
+  const R = game.rounds[r];
+  hudLive(d); clearInterval(timerId); $('#timer').hidden = true;
+  if (guessMarker) guessMarker.setMap(null);
+  $('#block').classList.remove('on');
+  $('#mapBox').classList.add('result'); $('#mapBox').classList.remove('open');
+  clearResultLayers();
+  const b = new G.LatLngBounds();
+  const actual = new G.Marker({ map, position: { lat: R.lat, lng: R.lng }, icon: { path: G.SymbolPath.CIRCLE, scale: 11, fillColor: '#3a9d4f', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 } });
+  resultLayers.push(actual); b.extend(actual.getPosition());
+  const rows = playerRows(d, r);
+  rows.forEach(x => {
+    if (!x.g || x.g.lat == null) return;
+    const m = pin({ lat: x.g.lat, lng: x.g.lng }, x.color, x.name.slice(0, 1).toUpperCase());
+    const line = new G.Polyline({ map, path: [{ lat: x.g.lat, lng: x.g.lng }, { lat: R.lat, lng: R.lng }], geodesic: true, strokeColor: x.color, strokeOpacity: .8, strokeWeight: 2 });
+    resultLayers.push(m, line); b.extend(m.getPosition());
+  });
+  map.fitBounds(b, 80);
+  rows.sort((a, c) => ((c.g || {}).pts || 0) - ((a.g || {}).pts || 0));
+  const last = r >= ROUNDS - 1;
+  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Round ${r + 1} of ${ROUNDS} · Room ${esc(room.code)}</div>
+    <div class="where" style="margin:4px 0 6px">📍 ${esc(R.desc || R.region)} · <a href="${mapsLink(R)}" target="_blank">open in Google Maps</a></div>
+    <div class="rounds">${rows.map(x => `<div><span><span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}</span><span>${x.g && x.g.km != null ? fmtDist(x.g.km) : 'no guess'} · <b>${((x.g || {}).pts || 0).toLocaleString()}</b></span></div>`).join('')}</div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:2px">Total after round ${r + 1}</div>
+    <div class="rounds">${standings(d, r).map((x, i) => `<div><span>${i + 1}. ${esc(x.name)}${x.me ? ' (you)' : ''}</span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="btns">${isHost() ? `<button class="primary" id="liveNext">${last ? 'Show final results' : 'Next round →'}</button>` : '<span class="help">Waiting for the host to continue…</span>'}</div>`;
+  $('#resPanel').classList.add('on');
+  if ($('#liveNext')) $('#liveNext').onclick = () => { $('#liveNext').disabled = true; api('next').then(pollRoom).catch(apiError); };
+}
+function showLiveFinal(d) {
+  if (live.finalShown) return;
+  live.finalShown = true;
+  game.idx = ROUNDS - 1; game.phase = 'final'; hud(); $('#hMode').innerHTML = `Room <b>${esc(d.room.code)}</b> · final`;
+  clearInterval(timerId); $('#timer').hidden = true;
+  if (guessMarker) guessMarker.setMap(null);
+  $('#block').classList.remove('on');
+  $('#mapBox').classList.add('result');
+  clearResultLayers();
+  const b = new G.LatLngBounds(); game.rounds.forEach((r, i) => drawRoundOnMap(r, i, b)); map.fitBounds(b, 60);
+  const st = standings(d, ROUNDS - 1);
+  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Final results · Room ${esc(d.room.code)}</div>
+    <h2>🏆 ${esc(st[0] ? st[0].name : '')} wins!</h2>
+    <div class="rounds">${st.map((x, i) => `<div><span>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} <span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}
+      <span style="color:var(--muted);font-size:12px"> ${x.per.map(v => (v / 1000).toFixed(1) + 'k').join(' · ')}</span></span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="btns"><button class="primary" id="liveCopy">Copy results</button><button id="liveHome">⌂ Back to home</button></div>`;
+  $('#resPanel').classList.add('on');
+  $('#liveCopy').onclick = () => copy(`Geo Clue live room ${d.room.code}\n` + st.map((x, i) => `${i + 1}. ${x.name} — ${x.tot.toLocaleString()}`).join('\n'));
+  $('#liveHome').onclick = showHome;
+}
+function renderLobby(d) {
+  const room = d.room, ids = Object.keys(d.players), host = room.hostId === sessId();
+  const link = location.origin + location.pathname + '?room=' + room.code;
+  $('#lobbyBody').innerHTML = `<div class="hicon">🌍</div><div class="hlogo small">Geo<span>Clue</span> · Live room</div>
+    <p class="tag" style="margin:0">Room code</p><div class="rcode">${esc(room.code)}</div>
+    <div style="display:flex;gap:6px;margin:10px 0 16px"><input readonly value="${esc(link)}" id="lbLink"><button id="lbCopy">Copy invite</button></div>
+    <div class="today" style="display:block"><b>Players (${ids.length}/10)</b>
+      <div class="rounds" style="margin:8px 0 0">${ids.map((id, i) => `<div><span><span style="color:${COLORS[i % COLORS.length]}">●</span> ${esc(d.players[id].name)}${id === room.hostId ? ' 👑' : ''}${id === sessId() ? ' (you)' : ''}</span></div>`).join('')}</div></div>
+    <p class="help">${esc((PACKS[room.settings.pack] || PACKS.world).name)} · ${MOVES[room.settings.move] || 'Moving'} · ${room.settings.timer ? room.settings.timer + 's per round' : 'no timer'} · 5 rounds</p>
+    <div class="hbtns">${host ? `<button class="primary" id="lbStart">Start game · ${ids.length} player${ids.length > 1 ? 's' : ''}</button>` : '<button disabled>Waiting for the host to start…</button>'}
+      <button id="lbLeave">Leave room</button></div>`;
+  $('#lobby').classList.add('on');
+  $('#lbCopy').onclick = () => copy(link);
+  $('#lbLink').onclick = e => e.target.select();
+  if ($('#lbStart')) $('#lbStart').onclick = () => { $('#lbStart').disabled = true; api('start').then(pollRoom).catch(apiError); };
+  $('#lbLeave').onclick = () => { leaveRoom(); showHome(); };
+}
+$('#hCreate').onclick = needKey(createRoom);
+$('#hJoin').onclick = needKey(() => joinRoom($('#hCode').value));
+$('#hCode').onkeydown = e => { if (e.key === 'Enter') $('#hJoin').click(); };
+
 // ---------- init ----------
+readUrl();
 showHome();
 loadServerKey().then(() => { if (homeOn()) renderHome(); });
 </script>
