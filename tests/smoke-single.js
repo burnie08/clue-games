@@ -51,7 +51,7 @@ async function geo(){
   class Pano extends O{constructor(e,o){super(o);panoLoads++;this.pano=o.pano}setOptions(o){this.pano=o.pano}getPano(){return this.pano}setPano(p){this.pano=p}setPov(){}setZoom(){}}
   let n=0;class SVS{async getPanorama(r){n++;return{data:{location:{pano:'P'+n,latLng:new LL(r.location.lat,r.location.lng),description:'X'}}}}}
   w.__LL=LL;
-  w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g'}},marker:{Marker}})[k]}};});
+  w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g',OUTDOOR:'o'}},marker:{Marker}})[k]}};});
  w.eval(src+';window.__t={g:()=>game,map:()=>map};');
  await sleep(50);
  console.log('GEO   start: home on',on(d,'#home'),'| google script loaded yet:',[...d.scripts].some(s=>/maps.googleapis/.test(s.src)),'| unl selects:',d.querySelector('#hPack').value,d.querySelector('#hMove').value,d.querySelector('#hTimer').value,'|',d.querySelector('#hUsage').textContent);
