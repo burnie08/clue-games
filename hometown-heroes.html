@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hometown Heroes</title>
+<style>
+:root{--bg:#0f1117;--panel:#181b24;--panel2:#20242f;--text:#e9ecf2;--muted:#8b93a7;--green:#3a9d4f;--gold:#c79a22;--red:#b8423f;--accent:#e4b343;--teal:#4fe0d2}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+body{display:flex;flex-direction:column}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:10px 14px;background:var(--panel2);color:var(--text)}
+button:hover:not(:disabled){filter:brightness(1.25)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:#1a1300;font-weight:700}
+input,select{font:inherit;background:var(--panel2);color:var(--text);border:1px solid #2f3442;border-radius:8px;padding:10px 12px;width:100%}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid #232733;flex-wrap:wrap;flex:none}
+.logo{font-weight:800;font-size:22px;letter-spacing:.5px;cursor:pointer}.logo span{color:var(--accent)}
+nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
+#game{position:relative;flex:1;min-height:0;overflow:hidden;background:#000}
+#pano{position:absolute;inset:0}
+#block{position:absolute;inset:0;z-index:5;display:none}
+#block.on{display:block}
+#hud{position:absolute;top:10px;left:10px;z-index:6;display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:#000b;border-radius:8px;padding:6px 10px;font-weight:600;font-size:14px}
+.chip small{color:var(--muted);font-weight:400}
+#timer.low{color:#ff6b6b}
+#tools{position:absolute;top:10px;right:10px;z-index:6;display:flex;gap:6px}
+#tools button{background:#000b;padding:8px 10px}
+#mapBox{position:absolute;right:12px;bottom:24px;width:320px;height:240px;z-index:7;display:flex;flex-direction:column;gap:6px;transition:width .15s,height .15s;opacity:.85}
+#mapBox:hover{width:min(620px,60vw);height:min(440px,60vh);opacity:1}
+#map{flex:1;border-radius:10px;overflow:hidden;border:2px solid #000}
+#guessBtn{width:100%}
+#mapToggle{display:none;position:absolute;right:12px;bottom:24px;z-index:7}
+#mapBox.result{left:0;right:0;top:0;bottom:0;width:auto;height:auto;opacity:1;transition:none}
+#mapBox.result #map{border:0;border-radius:0}
+#mapBox.result #guessBtn{display:none}
+#resPanel{position:absolute;left:50%;bottom:20px;transform:translateX(-50%);z-index:8;background:var(--panel);border-radius:14px;padding:16px 20px;min-width:300px;max-width:92vw;text-align:center;box-shadow:0 10px 40px #000a;display:none}
+#resPanel.on{display:block}
+#resPanel h2{margin:0 0 4px;font-size:26px}
+#resPanel .who{font-size:20px;margin:2px 0 4px}
+#resPanel .dist{color:var(--muted);margin-bottom:6px}
+#resPanel .where{color:var(--muted);font-size:13px;margin-bottom:10px}
+.kbadge{display:inline-block;background:var(--teal);color:#06201d;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;border-radius:6px;padding:2px 6px;vertical-align:middle}
+.bar{height:10px;background:#0b0d12;border-radius:5px;overflow:hidden;margin:8px 0 12px}
+.bar div{height:100%;background:var(--accent)}
+.rounds{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:14px;margin:8px 0 12px}
+.rounds div{display:flex;justify-content:space-between;gap:20px}
+.btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+#msg{position:absolute;inset:0;z-index:9;display:none;align-items:center;justify-content:center;text-align:center;padding:20px;background:var(--bg)}
+#msg.on{display:flex}
+#msg .inner{max-width:480px;color:var(--muted);line-height:1.5}
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:90vh;overflow:auto;position:relative}
+.mbox h2{margin-top:0}.mbox .close{position:absolute;right:10px;top:10px;background:none;font-size:22px}
+.mbox label{display:block;margin:12px 0 4px;color:var(--muted);font-size:13px}
+.help{color:var(--muted);font-size:13px;line-height:1.55}
+.help ol{padding-left:20px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stats{display:flex;gap:10px;text-align:center;margin-bottom:16px}
+.stats div{flex:1;background:var(--panel2);border-radius:10px;padding:10px}.stats b{display:block;font-size:22px}
+.usage{background:var(--panel2);border-radius:10px;padding:10px 12px;font-size:13px;margin-top:12px}
+.usage .bar{margin:6px 0 2px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#toast.show{opacity:1}
+@media (max-width:700px){
+  #mapBox{display:none;left:0;right:0;bottom:0;width:auto;height:65%;padding:8px;background:var(--bg);opacity:1}
+  #mapBox:hover{width:auto;height:65%}
+  #mapBox.open{display:flex}
+  #mapBox.result{display:flex;height:auto;padding:0}
+  #mapToggle{display:block}
+  #resPanel{bottom:10px;min-width:0;width:92vw}
+}
+
+/* ---------- home + end screens ---------- */
+.screen{position:fixed;inset:0;z-index:40;background:radial-gradient(circle at 50% 0%,#1f2433 0%,var(--bg) 55%);overflow:auto;display:none;justify-content:center;align-items:flex-start;padding:36px 16px 40px}
+.screen.on{display:flex}
+.hwrap{width:100%;max-width:520px;text-align:center}
+.hicon{font-size:54px;line-height:1}
+.hlogo{font-size:44px;font-weight:800;letter-spacing:.5px;margin:6px 0 8px}.hlogo span{color:var(--accent)}
+.hlogo.small{font-size:22px;margin:0 0 10px}
+.tag{color:var(--muted);line-height:1.5;margin:0 0 20px}
+.today{background:var(--panel);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today b{font-size:16px}.today .d{color:var(--muted);font-size:13px;margin-top:2px}.today .big{font-size:30px}
+.hbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.hbtns button{padding:14px;font-size:17px;border-radius:12px}
+.hmini{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+.hmini button{padding:8px 14px;font-size:14px}
+.hstats{display:flex;gap:8px;margin-bottom:16px}
+.hstats div{flex:1;background:var(--panel);border-radius:10px;padding:8px;font-size:12px;color:var(--muted)}
+.hstats b{display:block;font-size:20px;color:var(--text)}
+.back{color:var(--muted);text-decoration:none;font-size:14px}.back:hover{color:var(--accent)}
+.endtitle{font-size:30px;font-weight:800;margin:0 0 4px}
+.egrid{font-size:20px;line-height:1.25;letter-spacing:2px;margin:12px 0 16px;white-space:pre;overflow-x:auto}
+.opts{background:var(--panel);border-radius:14px;padding:12px;margin-bottom:16px;text-align:left}
+.optsTitle{font-weight:700;margin-bottom:8px}
+.endbox{background:var(--panel);border-radius:14px;padding:12px 16px;margin-bottom:16px}
+.rcode{font-size:60px;font-weight:800;letter-spacing:12px;color:var(--accent);line-height:1.1}
+#hCode{text-transform:uppercase;letter-spacing:3px}
+/* [hidden] must beat display rules like .grid2 and #modal (last rule; !important for real browsers) */
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Hometown<span>Heroes</span></div>
+  <nav>
+    <button id="bHome">⌂ Home</button>
+    <button id="bStats">Stats</button>
+    <button id="bHelp">?</button>
+    <button id="bSettings">⚙</button>
+  </nav>
+</header>
+<div id="game">
+  <div id="pano"></div>
+  <div id="block"></div>
+  <div id="hud">
+    <div class="chip" id="hRound"></div>
+    <div class="chip" id="hScore"></div>
+    <div class="chip" id="hMode"></div>
+    <div class="chip" id="timer" hidden></div>
+  </div>
+  <div id="tools"><button id="backBtn" title="Return to start">⟲ Start</button></div>
+  <button id="mapToggle" class="primary">🗺 Map</button>
+  <div id="mapBox">
+    <div id="map"></div>
+    <button id="guessBtn" class="primary" disabled>Place a pin on the map</button>
+  </div>
+  <div id="resPanel"></div>
+  <div id="msg"><div class="inner" id="msgInner">Loading…</div></div>
+</div>
+<div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
+<div id="toast"></div>
+<section id="home" class="screen"><div class="hwrap">
+  <div class="hicon">🏠</div>
+  <div class="hlogo">Hometown<span>Heroes</span></div>
+  <p class="tag">You're dropped in the town where an NHL player grew up. Look around, pin where you think you are, then find out whose hometown it was. 5 rounds, up to 5,000 points each.</p>
+  <div id="chalBanner"></div>
+  <div class="today" id="todayCard"></div>
+  <div class="hbtns"><button class="primary" id="hDaily">Play today's 5 hometowns</button></div>
+  <div class="opts">
+    <div class="optsTitle">Unlimited</div>
+    <div class="grid2"><select id="hMove" title="Movement"></select><select id="hTimer" title="Round timer"></select></div>
+    <button id="hUnl" style="width:100%;margin-top:8px">Play Unlimited</button>
+  </div>
+  <div class="opts">
+    <div class="optsTitle">⚔ Play with friends</div>
+    <div class="grid2" style="margin-bottom:8px"><select id="lMove" title="Live room movement"></select><select id="lTimer" title="Live room round timer"></select></div>
+    <button id="hCreate" class="primary" style="width:100%">Create a live room</button>
+    <div style="display:flex;gap:6px;margin-top:8px"><input id="hCode" placeholder="Room code" maxlength="6" autocomplete="off"><button id="hJoin">Join</button></div>
+    <p class="help" style="margin:8px 0 0">Pick the live room's movement and round timer above. As host you can still change them in the lobby. You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
+  </div>
+  <div id="hStatsRow"></div>
+  <div class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></div>
+  <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button><button id="hSet">⚙ Settings</button></div>
+  <a class="back" href="index.html">← All games</a>
+</div></section>
+<section id="endS" class="screen"><div class="hwrap" id="endBody"></div></section>
+<section id="lobby" class="screen"><div class="hwrap" id="lobbyBody"></div></section>
+
+<script>
+// ============================================================
+// PLAYERS — where each player grew up (not always the birthplace).
+// Researched list with sources: docs/hometown-heroes-players.md (owner reviews it before launch).
+// kraken: true = played at least 20 games for Seattle.
+// ============================================================
+const PLAYERS = [
+  { id: 'mccann', name: 'Jared McCann', team: 'Seattle Kraken', town: 'Stratford, ON', lat: 43.3701, lng: -80.9818, kraken: true },
+  { id: 'beniers', name: 'Matty Beniers', team: 'Seattle Kraken', town: 'Hingham, MA', lat: 42.2418, lng: -70.8898, kraken: true },
+  { id: 'eberle', name: 'Jordan Eberle', team: 'Seattle Kraken', town: 'Regina, SK', lat: 50.4480, lng: -104.6159, kraken: true },
+  { id: 'dunn', name: 'Vince Dunn', team: 'Seattle Kraken', town: 'Lindsay, ON', lat: 44.3551, lng: -78.7370, kraken: true },
+  { id: 'larsson', name: 'Adam Larsson', team: 'Seattle Kraken', town: 'Skelleftea, Sweden', lat: 64.7507, lng: 20.9528, kraken: true },
+  { id: 'oleksiak', name: 'Jamie Oleksiak', team: 'Vancouver Canucks', town: 'Toronto, ON', lat: 43.6535, lng: -79.3839, kraken: true },
+  { id: 'schwartz', name: 'Jaden Schwartz', team: 'Colorado Avalanche', town: 'Wilcox, SK', lat: 50.0977, lng: -104.7258, kraken: true },
+  { id: 'gourde', name: 'Yanni Gourde', team: 'Tampa Bay Lightning', town: 'Saint-Narcisse, QC', lat: 46.4837, lng: -71.2331, kraken: true },
+  { id: 'borgen', name: 'Will Borgen', team: 'Boston Bruins', town: 'Moorhead, MN', lat: 46.8739, lng: -96.7539, kraken: true },
+  { id: 'daccord', name: 'Joey Daccord', team: 'Seattle Kraken', town: 'North Andover, MA', lat: 42.7030, lng: -71.1309, kraken: true },
+  { id: 'bjorkstrand', name: 'Oliver Bjorkstrand', team: 'New York Rangers', town: 'Herning, Denmark', lat: 56.1380, lng: 8.9747, kraken: true },
+  { id: 'burakovsky', name: 'Andre Burakovsky', team: 'Ottawa Senators', town: 'Bunkeflostrand (Malmo), Sweden', lat: 55.5498, lng: 12.9299, kraken: true },
+  { id: 'grubauer', name: 'Philipp Grubauer', team: 'Seattle Kraken', town: 'Rosenheim, Germany', lat: 47.8558, lng: 12.1273, kraken: true },
+  { id: 'kakko', name: 'Kaapo Kakko', team: 'Seattle Kraken', town: 'Turku, Finland', lat: 60.4516, lng: 22.2670, kraken: true },
+  { id: 'tolvanen', name: 'Eeli Tolvanen', team: 'New York Rangers', town: 'Vihti, Finland', lat: 60.4170, lng: 24.3237, kraken: true },
+  { id: 'geekie', name: 'Morgan Geekie', team: 'Boston Bruins', town: 'Strathclair, MB', lat: 50.4045, lng: -100.3955, kraken: true },
+  { id: 'wright', name: 'Shane Wright', team: 'Nashville Predators', town: 'Burlington, ON', lat: 43.3249, lng: -79.7967, kraken: true },
+  { id: 'evans', name: 'Ryker Evans', team: 'Seattle Kraken', town: 'Calgary, AB', lat: 51.0456, lng: -114.0575, kraken: true },
+  { id: 'kartye', name: 'Tye Kartye', team: 'New York Rangers', town: 'Kingston, ON', lat: 44.3054, lng: -76.4284, kraken: true },
+  { id: 'stephenson', name: 'Chandler Stephenson', team: 'Seattle Kraken', town: 'Saskatoon, SK', lat: 52.1318, lng: -106.6608, kraken: true },
+  { id: 'montour', name: 'Brandon Montour', team: 'Seattle Kraken', town: 'Ohsweken (Six Nations), ON', lat: 43.0687, lng: -80.1180, kraken: true },
+  { id: 'lindgren', name: 'Ryan Lindgren', team: 'Seattle Kraken', town: 'Burnsville, MN', lat: 44.7671, lng: -93.2774, kraken: true },
+  { id: 'gaudreau', name: 'Frederick Gaudreau', team: 'Seattle Kraken', town: 'Bromont, QC', lat: 45.3187, lng: -72.6463, kraken: true },
+  { id: 'donato', name: 'Ryan Donato', team: 'Chicago Blackhawks', town: 'Scituate, MA', lat: 42.1924, lng: -70.7262, kraken: true },
+  { id: 'wennberg', name: 'Alexander Wennberg', team: 'San Jose Sharks', town: 'Nacka (Stockholm), Sweden', lat: 59.3121, lng: 18.2074, kraken: true },
+  { id: 'appleton', name: 'Mason Appleton', team: 'Detroit Red Wings', town: 'Green Bay, WI', lat: 44.5126, lng: -88.0126, kraken: true },
+  { id: 'dumoulin', name: 'Brian Dumoulin', team: 'Los Angeles Kings', town: 'Biddeford, ME', lat: 43.4926, lng: -70.4534, kraken: true },
+  { id: 'catton', name: 'Berkly Catton', team: 'Seattle Kraken', town: 'Saskatoon, SK', lat: 52.1318, lng: -106.6608, kraken: true },
+  { id: 'mahura', name: 'Josh Mahura', team: 'Seattle Kraken', town: 'St. Albert, AB', lat: 53.6332, lng: -113.6288, kraken: true },
+  { id: 'mcmann', name: 'Bobby McMann', team: 'Seattle Kraken', town: 'Wainwright, AB', lat: 52.8403, lng: -110.8514, kraken: true },
+  { id: 'melanson', name: 'Jacob Melanson', team: 'Seattle Kraken', town: 'Amherst, NS', lat: 45.8193, lng: -64.2334, kraken: true },
+  { id: 'meyers', name: 'Ben Meyers', team: 'Seattle Kraken', town: 'Delano, MN', lat: 45.0419, lng: -93.7891, kraken: true },
+  { id: 'nyman', name: 'Jani Nyman', team: 'Seattle Kraken', town: 'Valkeakoski, Finland', lat: 61.2656, lng: 24.0305, kraken: true },
+  { id: 'winterton', name: 'Ryan Winterton', team: 'Seattle Kraken', town: 'Markham, ON', lat: 43.8564, lng: -79.3377, kraken: true },
+  { id: 'blackwell', name: 'Colin Blackwell', team: 'Dallas Stars', town: 'North Andover, MA', lat: 42.7030, lng: -71.1309, kraken: true },
+  { id: 'eyssimont', name: 'Michael Eyssimont', team: 'Boston Bruins', town: 'Littleton, CO', lat: 39.6133, lng: -105.0166, kraken: true },
+  { id: 'yamamoto', name: 'Kailer Yamamoto', team: 'Utah (UTA)', town: 'Spokane, WA', lat: 47.6572, lng: -117.4235, kraken: true },
+  { id: 'giordano', name: 'Mark Giordano', team: 'Toronto Maple Leafs', town: 'North York (Toronto), ON', lat: 43.7543, lng: -79.4491, kraken: true },
+  { id: 'jarnkrok', name: 'Calle Jarnkrok', team: 'Toronto Maple Leafs', town: 'Gavle, Sweden', lat: 60.6749, lng: 17.1413, kraken: true },
+  { id: 'mcdavid', name: 'Connor McDavid', team: 'Edmonton Oilers', town: 'Newmarket, ON', lat: 44.0563, lng: -79.4617, kraken: false },
+  { id: 'draisaitl', name: 'Leon Draisaitl', team: 'Edmonton Oilers', town: 'Cologne, Germany', lat: 50.9384, lng: 6.9600, kraken: false },
+  { id: 'matthews', name: 'Auston Matthews', team: 'Toronto Maple Leafs', town: 'Scottsdale, AZ', lat: 33.5967, lng: -111.8910, kraken: false },
+  { id: 'mackinnon', name: 'Nathan MacKinnon', team: 'Colorado Avalanche', town: 'Cole Harbour, NS', lat: 44.6736, lng: -63.4877, kraken: false },
+  { id: 'makar', name: 'Cale Makar', team: 'Colorado Avalanche', town: 'Calgary, AB', lat: 51.0456, lng: -114.0575, kraken: false },
+  { id: 'pastrnak', name: 'David Pastrnak', team: 'Boston Bruins', town: 'Havirov, Czechia', lat: 49.7798, lng: 18.4369, kraken: false },
+  { id: 'hedman', name: 'Victor Hedman', team: 'Tampa Bay Lightning', town: 'Ornskoldsvik, Sweden', lat: 63.2909, lng: 18.7153, kraken: false },
+  { id: 'pettersson', name: 'Elias Pettersson', team: 'Vancouver Canucks', town: 'Sundsvall, Sweden', lat: 62.3908, lng: 17.3071, kraken: false },
+  { id: 'boeser', name: 'Brock Boeser', team: 'Vancouver Canucks', town: 'Burnsville, MN', lat: 44.7671, lng: -93.2774, kraken: false },
+  { id: 'aho', name: 'Sebastian Aho', team: 'Carolina Hurricanes', town: 'Rauma, Finland', lat: 61.1289, lng: 21.5039, kraken: false },
+  { id: 'heiskanen', name: 'Miro Heiskanen', team: 'Dallas Stars', town: 'Espoo, Finland', lat: 60.2050, lng: 24.6560, kraken: false },
+  { id: 'dahlin', name: 'Rasmus Dahlin', team: 'Buffalo Sabres', town: 'Lidkoping, Sweden', lat: 58.5053, lng: 13.1577, kraken: false },
+  { id: 'barkov', name: 'Aleksander Barkov', team: 'Florida Panthers', town: 'Tampere, Finland', lat: 61.4978, lng: 23.7616, kraken: false },
+  { id: 'forsberg', name: 'Filip Forsberg', team: 'Nashville Predators', town: 'Ostervala, Sweden', lat: 60.1833, lng: 17.2000, kraken: false },
+  { id: 'josi', name: 'Roman Josi', team: 'Nashville Predators', town: 'Bern, Switzerland', lat: 46.9485, lng: 7.4522, kraken: false },
+  { id: 'hischier', name: 'Nico Hischier', team: 'New Jersey Devils', town: 'Naters, Switzerland', lat: 46.3243, lng: 7.9884, kraken: false },
+  { id: 'barzal', name: 'Mathew Barzal', team: 'New York Islanders', town: 'Coquitlam, BC', lat: 49.2843, lng: -122.7933, kraken: false },
+  { id: 'fox', name: 'Adam Fox', team: 'New York Rangers', town: 'Jericho, NY', lat: 40.7874, lng: -73.5435, kraken: false },
+  { id: 'stutzle', name: 'Tim Stutzle', team: 'Ottawa Senators', town: 'Viersen, Germany', lat: 51.2562, lng: 6.3905, kraken: false },
+  { id: 'crosby', name: 'Sidney Crosby', team: 'Pittsburgh Penguins', town: 'Cole Harbour, NS', lat: 44.6736, lng: -63.4877, kraken: false },
+  { id: 'celebrini', name: 'Macklin Celebrini', team: 'San Jose Sharks', town: 'North Vancouver, BC', lat: 49.3206, lng: -123.0738, kraken: false },
+  { id: 'thomas', name: 'Robert Thomas', team: 'St. Louis Blues', town: 'Aurora, ON', lat: 43.9997, lng: -79.4675, kraken: false },
+  { id: 'connor', name: 'Kyle Connor', team: 'Winnipeg Jets', town: 'Shelby Township, MI', lat: 42.6700, lng: -83.0330, kraken: false },
+  { id: 'bedard', name: 'Connor Bedard', team: 'Chicago Blackhawks', town: 'North Vancouver, BC', lat: 49.3206, lng: -123.0738, kraken: false },
+  { id: 'kane', name: 'Patrick Kane', team: 'Chicago Blackhawks', town: 'South Buffalo, NY', lat: 42.8450, lng: -78.8200, kraken: false },
+  { id: 'stamkos', name: 'Steven Stamkos', team: 'Nashville Predators', town: 'Unionville (Markham), ON', lat: 43.8517, lng: -79.3143, kraken: false },
+  { id: 'carlsson', name: 'Leo Carlsson', team: 'Anaheim Ducks', town: 'Karlstad, Sweden', lat: 59.3809, lng: 13.5028, kraken: false },
+  { id: 'boldy', name: 'Matt Boldy', team: 'Minnesota Wild', town: 'Millis, MA', lat: 42.1675, lng: -71.3573, kraken: false },
+  { id: 'werenski', name: 'Zach Werenski', team: 'Columbus Blue Jackets', town: 'Grosse Pointe, MI', lat: 42.3861, lng: -82.9119, kraken: false },
+  { id: 'eichel', name: 'Jack Eichel', team: 'Vegas Golden Knights', town: 'North Chelmsford, MA', lat: 42.6390, lng: -71.3828, kraken: false },
+  { id: 'couturier', name: 'Sean Couturier', team: 'Philadelphia Flyers', town: 'Bathurst, NB', lat: 47.6209, lng: -65.6538, kraken: false },
+  { id: 'raymond', name: 'Lucas Raymond', team: 'Detroit Red Wings', town: 'Gothenburg, Sweden', lat: 57.7072, lng: 11.9670, kraken: false },
+  { id: 'kempe', name: 'Adrian Kempe', team: 'Los Angeles Kings', town: 'Kramfors, Sweden', lat: 62.9167, lng: 17.6667, kraken: false },
+  { id: 'suzuki', name: 'Nick Suzuki', team: 'Montreal Canadiens', town: 'London, ON', lat: 42.9837, lng: -81.2496, kraken: false },
+  { id: 'huberdeau', name: 'Jonathan Huberdeau', team: 'Calgary Flames', town: 'Saint-Jerome, QC', lat: 45.7804, lng: -74.0036, kraken: false },
+  { id: 'wilson', name: 'Tom Wilson', team: 'Washington Capitals', town: 'Toronto, ON', lat: 43.6535, lng: -79.3839, kraken: false },
+];
+const BY_ID = Object.fromEntries(PLAYERS.map(p => [p.id, p]));
+// lookups by a key that came from a link or a room: Object.hasOwn so names like "constructor" don't count
+const has = (o, k) => Object.hasOwn(o, k);
+const UNKNOWN = { id: '', name: 'Unknown player', team: '', town: 'unknown town', kraken: false };
+const playerOf = id => has(BY_ID, id) ? BY_ID[id] : UNKNOWN;
+const MOVES = { move: 'Moving', nomove: 'No move', nmpz: 'NMPZ' };
+const ROUNDS = 5;
+const HH_SIZE = 3000;       // scoring scale (km): right region scores well, right town ~5,000
+const SPOT_RADIUS = 5000;   // Street View must be within 5 km of the town centre
+const MAX_MISSES = 10;      // this many hometowns in a row without Street View = give up
+const START = { lat: 50, lng: -40 }, START_ZOOM = 2;   // North America + Europe
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const pad = n => String(n).padStart(2, '0');
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function monthKey() { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1); }
+function niceDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1800); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function shuffle(list, rng) { const a = list.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function distKm(a, b) {
+  const r = x => x * Math.PI / 180, dLat = r(b.lat - a.lat), dLng = r(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function scoreFor(km, size) { return Math.round(5000 * Math.exp(-10 * km / size)); }
+function fmtDist(km) {
+  if (settings.units === 'mi') { const mi = km * 0.621371; return mi < 0.2 ? Math.round(mi * 5280) + ' ft' : mi < 100 ? mi.toFixed(1) + ' mi' : Math.round(mi).toLocaleString() + ' mi'; }
+  return km < 1 ? Math.round(km * 1000) + ' m' : km < 100 ? km.toFixed(1) + ' km' : Math.round(km).toLocaleString() + ' km';
+}
+function showMsg(html) { $('#msgInner').innerHTML = html; $('#msg').classList.add('on'); }
+function hideMsg() { $('#msg').classList.remove('on'); }
+const kBadge = p => p.kraken ? '<span class="kbadge">Kraken</span> ' : '';
+
+// ---------- settings & usage ----------
+// Google key, Street View limit, units and your name are shared with Geo Clue (gc:settings), so they're only entered once.
+// Hometown Heroes' own choices (movement, timer, live room) live in hh:settings.
+const SHARED_KEYS = ['key', 'cap', 'units', 'name'], OWN_KEYS = ['move', 'timer', 'liveMove', 'liveTimer'];
+const pick = (o, keys) => Object.fromEntries(keys.filter(k => o && o[k] !== undefined).map(k => [k, o[k]]));
+let settings = Object.assign({ key: '', cap: 4000, units: 'mi', move: 'move', timer: 0, liveMove: 'move', liveTimer: 120 },
+  pick(LS.get('gc:settings', {}), SHARED_KEYS), pick(LS.get('hh:settings', {}), OWN_KEYS));
+const LIVE_TIMERS = [0, 30, 60, 90, 120, 180, 300];
+const timerName = t => !t ? 'No timer' : t % 60 ? t + 's' : (t / 60) + ' min';
+// Optional: a key stored in Vercel (GOOGLE_MAPS_KEY) is served by /api/config, so every device works without pasting it.
+let serverKey = '';
+function saveSettings() {
+  const s = pick(settings, SHARED_KEYS); if (serverKey && s.key === serverKey) s.key = '';
+  LS.set('gc:settings', Object.assign(LS.get('gc:settings', {}), s));
+  LS.set('hh:settings', pick(settings, OWN_KEYS));
+}
+async function loadServerKey() {
+  try {
+    const r = await fetch('api/config', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && j.googleMapsKey) { serverKey = j.googleMapsKey; if (!settings.key) settings.key = serverKey; }
+  } catch (e) { /* no server config — fine */ }
+}
+// Same counters as Geo Clue: this device's count (gc:usage) + the shared count for everyone (/api/usage).
+function usage() { const u = LS.get('gc:usage', null); return u && u.month === monthKey() ? u : { month: monthKey(), panos: 0, maps: 0 }; }
+function bump(kind) { const u = usage(); u[kind]++; LS.set('gc:usage', u); if (kind === 'panos') bumpShared(); }
+const FREE_PANOS = 5000;
+let shared = null;
+async function usageCall(opts) {
+  try {
+    const r = await fetch('api/usage', Object.assign({ cache: 'no-store' }, opts));
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j && typeof j.panos === 'number') shared = { month: j.month, panos: j.panos };
+  } catch (e) { /* no server or database down — fall back to this device's count */ }
+}
+const loadShared = () => usageCall();
+function bumpShared() {
+  if (shared) shared.panos++;
+  usageCall({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'bump' }) });
+}
+function usedPanos() { return shared ? shared.panos : usage().panos; }
+function overCap() { return usedPanos() >= settings.cap; }
+function meterHTML() {
+  const used = usedPanos(), left = Math.max(0, FREE_PANOS - used), pct = Math.min(100, used / FREE_PANOS * 100);
+  const col = pct >= 80 ? 'var(--red)' : pct >= 60 ? 'var(--gold)' : 'var(--green)';
+  const now = new Date(), days = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), day = now.getDate();
+  const mon = d => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const reset = mon(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+  let runway;
+  if (!left) runway = 'Free amount used up for this month.';
+  else if (used / day * days <= FREE_PANOS) runway = 'At this pace it lasts the month.';
+  else runway = `At this pace it runs out around ${mon(new Date(now.getFullYear(), now.getMonth(), Math.max(day, Math.floor(FREE_PANOS / (used / day)))))}.`;
+  return `<div class="meter"><b>${used.toLocaleString()}</b> of ${FREE_PANOS.toLocaleString()} free Street View loads used · <b>${left.toLocaleString()}</b> left · resets ${reset}${shared ? '' : ' <span class="help">(this device only)</span>'}
+    <div class="bar"><div style="width:${pct}%;background:${col}"></div></div>
+    <span class="help">${runway} Shared with Geo Clue. The game stops at your limit of ${settings.cap.toLocaleString()}.</span></div>`;
+}
+
+// ---------- Google Maps loading (only when a game starts) ----------
+let G = null, map = null, pano = null, sv = null, guessMarker = null, resultLayers = [];
+function loadGoogle() {
+  if (G) return Promise.resolve();
+  return new Promise((res, rej) => {
+    window.gm_authFailure = () => showMsg('Google rejected the API key.<br><br>Check that the <b>Maps JavaScript API</b> is enabled, billing is set up, and the key allows this website. Then fix the key in ⚙ Settings.');
+    window.__gcReady = async () => {
+      try {
+        const libs = await Promise.all(['core', 'maps', 'streetView', 'marker'].map(l => google.maps.importLibrary(l)));
+        G = Object.assign({}, ...libs);
+        res();
+      } catch (e) { rej(e); }
+    };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(settings.key)}&v=weekly&loading=async&callback=__gcReady`;
+    s.async = true;
+    s.onerror = () => rej(new Error('Could not load Google Maps. Check your connection.'));
+    document.head.appendChild(s);
+  });
+}
+function initMap() {
+  if (map) return;
+  map = new G.Map($('#map'), { center: START, zoom: START_ZOOM, disableDefaultUI: true, zoomControl: true, clickableIcons: false, draggableCursor: 'crosshair', gestureHandling: 'greedy' });
+  bump('maps');
+  sv = new G.StreetViewService();
+  map.addListener('click', e => {
+    if (!game || game.phase !== 'play') return;
+    const p = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+    if (!guessMarker) guessMarker = new G.Marker({ map, position: p });
+    else { guessMarker.setPosition(p); guessMarker.setMap(map); }
+    $('#guessBtn').disabled = false; $('#guessBtn').textContent = 'Guess';
+  });
+}
+
+// ---------- finding spots (metadata lookups are free) ----------
+// The nearest Google-owned pano within 5 km of the player's hometown, or null if there's none.
+async function findHometownSpot(player, rng = Math.random) {
+  try {
+    const { data } = await sv.getPanorama({ location: { lat: player.lat, lng: player.lng }, radius: SPOT_RADIUS, preference: 'nearest', sources: [G.StreetViewSource.GOOGLE] });
+    const loc = data && data.location;
+    if (!loc || !loc.pano) return null;
+    return { pano: loc.pano, lat: loc.latLng.lat(), lng: loc.latLng.lng(), heading: Math.round(rng() * 360), ans: player.id, pts: null };
+  } catch (e) { return null; }   // no coverage near this town
+}
+// A game's plan from a seed: 2 or 3 Kraken slots among the 5, then each group (Kraken / league) in a shuffled order.
+function roundPlan(seed) {
+  const rng = mulberry32(seed);
+  const nK = rng() < 0.5 ? 2 : 3;
+  const groups = [shuffle(PLAYERS.filter(p => !p.kraken), rng), shuffle(PLAYERS.filter(p => p.kraken), rng)];
+  const slots = shuffle([0, 1, 2, 3, 4].map(i => i < nK ? 1 : 0), rng);   // 1 = Kraken slot
+  return { slots, groups };
+}
+// Today's 5 players (assuming every hometown has Street View)
+function pickDaily(key) {
+  const { slots, groups } = roundPlan(hash('hh-' + key)), next = [0, 0];
+  return slots.map(s => groups[s][next[s]++].id);
+}
+// Walk the plan: a hometown with no Street View is skipped for the next player of the same group, so the
+// Kraken mix holds and Daily is the same on every device. Each player's heading comes from the seed + their id.
+async function makeRounds(seed) {
+  const { slots, groups } = roundPlan(seed), next = [0, 0], rounds = [];
+  let misses = 0;
+  for (const s of slots) {
+    let r = null;
+    while (!r && next[s] < groups[s].length && misses < MAX_MISSES) {
+      const p = groups[s][next[s]++];
+      r = await findHometownSpot(p, mulberry32(hash(seed + ':' + p.id)));
+      misses = r ? 0 : misses + 1;
+    }
+    if (!r) throw new Error('Could not find Street View in the players\' hometowns. Try again.');
+    rounds.push(r);
+  }
+  return rounds;
+}
+const randomSeed = () => (Math.random() * 2 ** 32) >>> 0;
+
+// ---------- game ----------
+let game = null, timerId = null;
+function save() {
+  const k = game.mode === 'daily' ? 'hh:g:' + game.key : game.mode === 'chal' ? 'hh:c:' + game.cid : game.mode === 'unl' ? 'hh:g:unl' : null;
+  if (k) LS.set(k, game);
+}
+const ruleLabel = (move, timer) => `${has(MOVES, move) ? MOVES[move] : 'Moving'}${timer ? ' · ⏱ ' + timerName(timer) : ''}`;
+function modeLabel() {
+  if (game.mode === 'daily') return `Daily · ${niceDate(game.key)}`;
+  const base = ruleLabel(game.move, game.timer);
+  return game.mode === 'chal' ? '⚔ Challenge · ' + base : game.mode === 'live' ? 'Live · ' + base : base;
+}
+async function boot() {
+  if (!settings.key) { showMsg('Add your Google Maps API key in ⚙ Settings to play.'); openSettings(true); return false; }
+  if (G) return true;
+  showMsg('Loading Google Maps…');
+  try { await loadGoogle(); initMap(); return true; }
+  catch (e) { showMsg(esc(e.message)); return false; }
+}
+function showCapMsg() { showMsg(`${shared ? 'Everyone has' : 'You\'ve'} used <b>${usedPanos().toLocaleString()}</b> Street View loads this month, which hits your limit of ${settings.cap.toLocaleString()}.<br><br>Google gives 5,000 free per month. You can raise the limit in ⚙ Settings, or wait for next month.`); }
+// over the limit and about to need a new Street View round: stop before Google Maps even loads
+const capBlocks = saved => overCap() && !(saved && saved.phase === 'result');
+// a finished game only needs the end screen, not Google Maps
+function showSavedFinal(saved) { game = saved; hideMsg(); showFinal(); }
+async function startDaily() {
+  hideHome();
+  const key = dateKey(new Date()), saved = LS.get('hh:g:' + key, null);
+  if (saved && saved.phase === 'final') return showSavedFinal(saved);
+  if (capBlocks(saved)) { showCapMsg(); return; }
+  if (!(await boot())) return;
+  if (saved) { game = saved; return resume(); }
+  showMsg('Finding today\'s 5 hometowns…');
+  let rounds;
+  try { rounds = await makeRounds(hash('hh-' + key)); }
+  catch (e) { showMsg(esc(e.message)); return; }
+  game = { mode: 'daily', key, move: 'move', timer: 0, rounds, idx: 0, phase: 'play' };
+  save(); resume();
+}
+async function startUnlimited(fresh) {
+  hideHome();
+  const saved = LS.get('hh:g:unl', null), resumeIt = !fresh && unlMatches(saved);
+  if (capBlocks(resumeIt ? saved : null)) { showCapMsg(); return; }
+  if (!(await boot())) return;
+  if (resumeIt) { game = saved; return resume(); }
+  showMsg('Finding 5 hometowns…');
+  let rounds;
+  try { rounds = await makeRounds(randomSeed()); }
+  catch (e) { showMsg(esc(e.message)); return; }
+  game = { mode: 'unl', key: 'unl', move: settings.move, timer: +settings.timer, rounds, idx: 0, phase: 'play' };
+  save(); resume();
+}
+function resume() {
+  hideMsg();
+  if (game.phase === 'play') showRound();
+  else if (game.phase === 'result') showResult();
+  else showFinal();
+}
+function total() { return game.rounds.reduce((a, r) => a + (r.pts || 0), 0); }
+function hud() {
+  $('#hRound').innerHTML = `Round <b>${Math.min(game.idx + 1, ROUNDS)}</b><small>/${ROUNDS}</small>`;
+  $('#hScore').innerHTML = `${total().toLocaleString()} <small>pts</small>`;
+  $('#hMode').innerHTML = modeLabel();
+}
+function clearResultLayers() { resultLayers.forEach(l => l.setMap(null)); resultLayers = []; }
+
+function showRound() {
+  if (overCap()) { showCapMsg(); return; }
+  const r = game.rounds[game.idx];
+  hud(); clearResultLayers();
+  $('#resPanel').classList.remove('on');
+  $('#mapBox').classList.remove('result', 'open');
+  if (guessMarker) guessMarker.setMap(null);
+  $('#guessBtn').disabled = true; $('#guessBtn').textContent = 'Place a pin on the map';
+  map.setCenter(START); map.setZoom(START_ZOOM);
+  const nm = game.move !== 'move', nmpz = game.move === 'nmpz';
+  const opts = { pano: r.pano, pov: { heading: r.heading, pitch: 0 }, zoom: 0, visible: true,
+    addressControl: false, showRoadLabels: false, fullscreenControl: false, motionTracking: false, motionTrackingControl: false, enableCloseButton: false,
+    linksControl: !nm, clickToGo: !nm, scrollwheel: !nmpz, zoomControl: !nmpz, panControl: true };
+  if (!pano) {
+    pano = new G.StreetViewPanorama($('#pano'), opts);
+    pano.addListener('pano_changed', () => { if (game && game.phase === 'play' && game.move !== 'move' && pano.getPano() !== game.rounds[game.idx].pano) pano.setPano(game.rounds[game.idx].pano); });
+  } else { pano.setOptions(opts); }
+  bump('panos');
+  $('#block').classList.toggle('on', nmpz);
+  $('#backBtn').hidden = nmpz;
+  startTimer();
+}
+function startTimer() {
+  clearInterval(timerId);
+  const t = $('#timer');
+  if (!game.timer) { t.hidden = true; return; }
+  let left = game.timer; t.hidden = false;
+  if (game.mode === 'live' && live && live.data) left = Math.max(1, Math.round(game.timer - (Date.now() + live.skew - live.data.room.startedAt) / 1000));
+  const draw = () => { t.textContent = `⏱ ${left}s`; t.classList.toggle('low', left <= 10); };
+  draw();
+  timerId = setInterval(() => { left--; draw(); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
+}
+function makeGuess(timedOut) {
+  if (!game || game.phase !== 'play') return;
+  clearInterval(timerId);
+  const r = game.rounds[game.idx];
+  if (guessMarker && guessMarker.getMap()) {
+    const p = guessMarker.getPosition(); r.guess = { lat: p.lat(), lng: p.lng() };
+    r.km = distKm(r.guess, r); r.pts = scoreFor(r.km, HH_SIZE);
+  } else { r.guess = null; r.km = null; r.pts = 0; if (timedOut) toast('Time\'s up!'); }
+  if (game.mode === 'live') { game.phase = 'wait'; if (live && live.data) showWaiting(live.data); postLiveGuess(r); return; }
+  game.phase = 'result'; save(); showResult();
+}
+function dot(pos, color, label, scale) {
+  return new G.Marker({ map, position: pos, label: label ? { text: label, color: '#111', fontWeight: '700', fontSize: '11px' } : undefined,
+    icon: { path: G.SymbolPath.CIRCLE, scale, fillColor: color, fillOpacity: 1, strokeColor: '#000', strokeWeight: 1.5 } });
+}
+function mapsLink(r) { return `https://www.google.com/maps/@?api=1&map_action=pano&pano=${encodeURIComponent(r.pano)}`; }
+// the reveal: the mini-map grows to full screen; draw the hometown spot (green) and the guesses, then fit them
+function revealMap(R, guesses) {
+  clearInterval(timerId); $('#timer').hidden = true;
+  if (guessMarker) guessMarker.setMap(null);
+  $('#block').classList.remove('on');
+  $('#mapBox').classList.add('result'); $('#mapBox').classList.remove('open');
+  clearResultLayers();
+  const b = new G.LatLngBounds(), at = { lat: R.lat, lng: R.lng };
+  const spot = dot(at, '#3a9d4f', '', 11); resultLayers.push(spot); b.extend(spot.getPosition());
+  guesses.forEach(x => {
+    const m = dot(x.pos, x.color, x.label, 8);
+    const line = new G.Polyline({ map, path: [x.pos, at], geodesic: true, strokeColor: x.color, strokeOpacity: .8, strokeWeight: 2 });
+    resultLayers.push(m, line); b.extend(m.getPosition());
+  });
+  // the map just changed size: wait a frame, tell Google, then fit
+  const fit = () => { if (G.event) G.event.trigger(map, 'resize'); if (guesses.length) map.fitBounds(b, 80); else { map.setCenter(at); map.setZoom(6); } };
+  if (window.requestAnimationFrame) requestAnimationFrame(fit); else setTimeout(fit, 0);
+}
+function whoHTML(p) {
+  return `<div class="who">${kBadge(p)}<b>${esc(p.name)}</b> <span style="color:var(--muted);font-size:15px">· ${esc(p.team)}</span></div>
+    <div class="dist">Grew up in <b>${esc(p.town)}</b></div>`;
+}
+function showResult() {
+  const r = game.rounds[game.idx], p = playerOf(r.ans);
+  hud(); revealMap(r, r.guess ? [{ pos: r.guess, color: '#e4b343', label: '' }] : []);
+  const last = game.idx >= ROUNDS - 1;
+  $('#resPanel').innerHTML = `<h2>${(r.pts || 0).toLocaleString()} <span style="font-size:15px;color:var(--muted)">/ 5,000</span></h2>
+    <div class="bar"><div style="width:${(r.pts || 0) / 50}%"></div></div>
+    ${whoHTML(p)}
+    <div class="where">${r.guess ? `Your pin was <b>${fmtDist(r.km)}</b> away` : 'No pin placed'} · <a href="${mapsLink(r)}" target="_blank">open in Google Maps</a></div>
+    <div class="btns"><button class="primary" id="nextBtn">${last ? 'See final score' : 'Next round →'}</button></div>`;
+  $('#resPanel').classList.add('on');
+  $('#nextBtn').onclick = () => {
+    if (game.phase !== 'result') return;
+    if (last) { game.phase = 'final'; if (game.mode === 'daily') recordStat(); save(); showFinal(); }
+    else { game.idx++; game.phase = 'play'; save(); showRound(); }
+  };
+}
+const sq = p => p >= 4000 ? '🟩' : p >= 2000 ? '🟨' : p >= 500 ? '🟧' : '🟥';
+function roundList(rounds, withScore) {
+  return `<div class="rounds">${rounds.map((r, i) => { const p = playerOf(r.ans); return `<div><span>${i + 1}. ${kBadge(p)}<a href="${mapsLink(r)}" target="_blank">${esc(p.name)}</a>
+    <span style="color:var(--muted);font-size:12px"> ${esc(p.town)}</span></span><span>${r.guess ? fmtDist(r.km) : 'no pin'}${withScore ? ` · <b>${(r.pts || 0).toLocaleString()}</b>` : ''}</span></div>`; }).join('')}</div>`;
+}
+function showFinal() {
+  game.idx = ROUNDS - 1; clearInterval(timerId); $('#timer').hidden = true;
+  $('#block').classList.remove('on'); $('#resPanel').classList.remove('on');
+  const t = total();
+  $('#endBody').innerHTML = `<div class="hicon">${t >= 20000 ? '🏆' : t >= 12000 ? '🏒' : '🏠'}</div>
+    <div class="endtitle">${t.toLocaleString()} / 25,000</div>
+    <p class="tag" style="margin:0">${modeLabel()}</p>
+    <div class="egrid">${game.rounds.map(r => sq(r.pts || 0)).join('')}</div>
+    <div class="endbox">${roundList(game.rounds, true)}</div>
+    ${game.mode === 'daily' ? statsRow() : ''}${game.mode === 'chal' ? `<div class="endbox">${chalBoard()}</div>` : ''}
+    <div class="hbtns"><button class="primary" id="shareBtn">Copy result</button><button id="chalBtn">${game.mode === 'chal' ? '⚔ Send results back' : '⚔ Challenge a friend'}</button>${game.mode === 'unl' ? '<button id="againBtn">New game →</button>' : ''}<button id="eHome">⌂ Back to home</button></div>`;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
+  $('#shareBtn').onclick = () => copy(shareText());
+  $('#chalBtn').onclick = shareChallenge;
+  if ($('#againBtn')) $('#againBtn').onclick = () => startUnlimited(true);
+  $('#eHome').onclick = showHome;
+}
+function shareText() {
+  const label = game.mode === 'daily' ? game.key : (game.mode === 'chal' ? 'Challenge · ' : '') + ruleLabel(game.move, game.timer);
+  return `Hometown Heroes ${label}\n${total().toLocaleString()} / 25,000\n${game.rounds.map(r => sq(r.pts || 0)).join('')}`;
+}
+async function copy(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Copied!');
+}
+
+// ---------- buttons ----------
+$('#guessBtn').onclick = () => makeGuess(false);
+$('#mapToggle').onclick = () => $('#mapBox').classList.toggle('open');
+$('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(0); } };
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || homeOn() || $('#endS').classList.contains('on') || !$('#modal').hidden) return;
+  if ((e.key === ' ' || e.key === 'Enter') && game) {
+    if (game.phase === 'play' && !$('#guessBtn').disabled) { e.preventDefault(); makeGuess(false); }
+    else if (game.phase === 'result' && $('#nextBtn')) { e.preventDefault(); $('#nextBtn').click(); }
+  }
+});
+
+// ---------- stats ----------
+function recordStat() { const s = LS.get('hh:stats', {}); if (!(game.key in s)) { s[game.key] = total(); LS.set('hh:stats', s); } }
+function openStats() {
+  const s = LS.get('hh:stats', {}), keys = Object.keys(s).sort().reverse(), v = keys.map(k => s[k]);
+  const avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  openModal(`<h2>Stats</h2><div class="stats"><div><b>${v.length}</b>Dailies</div><div><b>${avg.toLocaleString()}</b>Average</div><div><b>${(v.length ? Math.max(...v) : 0).toLocaleString()}</b>Best</div></div>
+  <div class="help">${keys.slice(0, 14).map(k => `${niceDate(k)} — <b>${s[k].toLocaleString()}</b>`).join('<br>') || 'No daily games yet.'}</div>`);
+}
+function statsRow() {
+  const v = Object.values(LS.get('hh:stats', {})), avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0;
+  return `<div class="hstats"><div><b>${v.length}</b>Dailies</div><div><b>${avg.toLocaleString()}</b>Average</div><div><b>${(v.length ? Math.max(...v) : 0).toLocaleString()}</b>Best</div></div>`;
+}
+
+// ---------- settings / help ----------
+function openSettings(first) {
+  const u = usage();
+  openModal(`<h2>${first ? 'Set up Hometown Heroes' : 'Settings'}</h2>
+  ${first ? setupSteps() : ''}
+  <label>Google Maps API key (shared with Geo Clue)</label><input id="sKey" value="${esc(settings.key === serverKey ? '' : settings.key)}" placeholder="${serverKey ? 'Using the key from your Vercel settings ✓' : 'AIza…'}" autocomplete="off">
+  <p class="help" style="margin:4px 0 0">Saves as soon as you paste it.</p>
+  <label>Your name (shown in challenges and live rooms, shared with Geo Clue)</label><input id="sName" maxlength="24" value="${esc(settings.name || '')}" autocomplete="off">
+  <div class="grid2">
+    <div><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    <div><label>Unlimited: round timer</label><select id="sTimer">${[0, 30, 60, 120, 180].map(t => `<option value="${t}" ${t === +settings.timer ? 'selected' : ''}>${t ? t + ' seconds' : 'Off'}</option>`).join('')}</select></div>
+    <div><label>Distance units</label><select id="sUnits"><option value="mi" ${settings.units === 'mi' ? 'selected' : ''}>Miles</option><option value="km" ${settings.units === 'km' ? 'selected' : ''}>Kilometers</option></select></div>
+  </div>
+  <label>Monthly Street View limit, shared with Geo Clue (stops the game at this many loads; Google's free amount is 5,000)</label>
+  <input id="sCap" type="number" min="100" max="5000" step="100" value="${settings.cap}">
+  <div class="usage"><div id="sMeter">${meterHTML()}</div>
+    <div class="help" style="margin-top:8px">This browser alone: ${u.panos.toLocaleString()} Street View loads · ${u.maps.toLocaleString()} map loads (all games). Google's exact total is in Google Cloud Console → Google Maps Platform → Metrics.</div></div>
+  <div class="btns" style="margin-top:14px;justify-content:flex-start"><button class="primary" id="sSave">Save</button></div>`);
+  loadShared().then(renderMeters);
+  const keyAtOpen = settings.key;
+  const readKey = () => $('#sKey').value.trim() || serverKey;
+  $('#sKey').oninput = () => { settings.key = readKey(); saveSettings(); };
+  $('#sSave').onclick = () => {
+    const newKey = readKey();
+    if (!newKey) { toast('Enter an API key'); return; }
+    const keyChanged = newKey !== keyAtOpen;
+    Object.assign(settings, { key: newKey, name: $('#sName').value.trim(), move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
+    saveSettings(); closeModal();
+    if (keyChanged && G) { location.reload(); return; }
+    if (first) startDaily();
+    else if (homeOn()) renderHome();
+    else if (game && game.phase === 'play') hud();
+    else if (game) resume();
+  };
+}
+function setupSteps() {
+  return `<div class="help"><p>Hometown Heroes uses the same Google Maps key as Geo Clue. If you've set up Geo Clue in this browser, you're already done. A 5-round game uses about 5 of the 5,000 free Street View loads per month.</p><ol>
+  <li>Go to <a href="https://developers.google.com/maps/get-started" target="_blank">Google Maps Platform → Get started</a> and create a project. Google requires billing to be set up, even for free usage.</li>
+  <li>Enable the <b>Maps JavaScript API</b>.</li>
+  <li>Under <b>Keys &amp; Credentials</b>, create an API key. Restrict it to your site and to the Maps JavaScript API only.</li>
+  <li>Paste the key below. It's saved in this browser only.<br><b>To make it work on every device:</b> in Vercel add <code>GOOGLE_MAPS_KEY</code> under Settings → Environment Variables, then redeploy.</li></ol></div>`;
+}
+function openHelp() {
+  openModal(`<h2>How to play</h2><div class="help">
+  <p>You're dropped in Street View in the town where an NHL player grew up. Look around for clues (signs, language, license plates, the landscape) then click the map to pin where you think you are.</p>
+  <p>Each round scores up to <b>5,000</b> points: the right town scores close to 5,000, the right region still scores well. Then you find out whose hometown it was. Seattle Kraken players (past and present) get a <span class="kbadge">Kraken</span> badge.</p>
+  <p><b>Daily</b>: same 5 players for everyone each day (2 or 3 of them Kraken), moving allowed, no timer.<br><b>Unlimited</b>: pick a movement rule and timer.</p>
+  <p><b>Moving</b> = walk around · <b>No move</b> = look around only · <b>NMPZ</b> = no moving, panning or zooming.</p>
+  <p><b>⚔ Challenge links</b>: finish any game and send the link. Friends play the same 5 hometowns whenever they like and see the leaderboard.<br><b>🎮 Live rooms</b>: create a room, share the 4-letter code, and everyone plays the same rounds at the same time with a scoreboard after each round. Up to 10 players.</p>
+  <p>Hover the mini-map to make it bigger (tap 🗺 on phones). Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
+}
+function openModal(h) { $('#mbody').innerHTML = h; $('#modal').hidden = false; }
+function closeModal() { $('#modal').hidden = true; if (homeOn()) renderHome(); }
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+$('#bHome').onclick = showHome;
+$('.logo').onclick = showHome;
+$('#bStats').onclick = openStats;
+$('#bHelp').onclick = openHelp;
+$('#bSettings').onclick = () => openSettings(!settings.key);
+
+// ---------- home screen (Google Maps isn't loaded until you press play) ----------
+function homeOn() { return $('#home').classList.contains('on'); }
+function showHome() { clearInterval(timerId); if (live) leaveRoom(); $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
+function unlMatches(g) { return g && g.phase !== 'final' && g.move === settings.move && g.timer === +settings.timer; }
+function renderHome() {
+  const today = dateKey(new Date()), g = LS.get('hh:g:' + today, null);
+  let status, icon = '🏠', label;
+  if (!settings.key) { status = '<b>Quick setup needed</b><div class="d">Add your Google Maps API key to start</div>'; icon = '🔑'; label = 'Set up & play'; }
+  else if (!g) { status = `<b>Today's 5 hometowns are waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's 5 hometowns"; }
+  else if (g.phase !== 'final') { status = `<b>In progress · round ${g.idx + 1}/5</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else { const t = g.rounds.reduce((a, r) => a + (r.pts || 0), 0); status = `<b>${t.toLocaleString()} / 25,000</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = t >= 20000 ? '🏆' : '✅'; label = "See today's result"; }
+  $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  renderBanner();
+  if (pendingRoom && !$('#hCode').value) $('#hCode').value = pendingRoom;
+  $('#hDaily').textContent = label;
+  const fill = (id, entries, val) => { $(id).innerHTML = entries.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join(''); };
+  fill('#hMove', Object.entries(MOVES), settings.move);
+  fill('#hTimer', [0, 30, 60, 120, 180].map(t => [t, t ? `⏱ ${t}s` : 'No timer']), settings.timer);
+  fill('#lMove', Object.entries(MOVES), settings.liveMove);
+  fill('#lTimer', LIVE_TIMERS.map(t => [t, '⏱ ' + timerName(t)]), settings.liveTimer);
+  $('#hUnl').textContent = unlMatches(LS.get('hh:g:unl', null)) ? 'Continue Unlimited game' : 'Play Unlimited';
+  $('#hStatsRow').innerHTML = statsRow();
+  renderMeters();
+  loadShared().then(renderMeters);
+}
+function renderMeters() {
+  $('#hUsage').innerHTML = settings.key ? meterHTML() : '';
+  if ($('#sMeter')) $('#sMeter').innerHTML = meterHTML();
+}
+['#hMove', '#hTimer'].forEach(id => $(id).onchange = () => {
+  Object.assign(settings, { move: $('#hMove').value, timer: +$('#hTimer').value });
+  saveSettings(); renderHome();
+});
+['#lMove', '#lTimer'].forEach(id => $(id).onchange = () => {
+  Object.assign(settings, { liveMove: $('#lMove').value, liveTimer: +$('#lTimer').value });
+  saveSettings();
+});
+const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
+$('#hDaily').onclick = needKey(() => startDaily());
+$('#hUnl').onclick = needKey(() => startUnlimited(false));
+$('#hHow').onclick = openHelp;
+$('#hStats').onclick = openStats;
+$('#hSet').onclick = () => openSettings(!settings.key);
+
+// ============================================================
+// PLAY WITH FRIENDS — challenge links (no setup) + live rooms (same /api/room as Geo Clue)
+// ============================================================
+const COLORS = ['#e4b343', '#4fa3ff', '#ff6b9a', '#7ddc6f', '#c38bff', '#ff8f4f', '#4fe0d2', '#f5f56b', '#ff5c5c', '#a0a0ff'];
+// rooms and links are shared between the games: one made for another game is handed to that game's page
+const GAME_PAGES = { geo: 'geo-clue.html', ntt: 'name-that-team.html', hh: 'hometown-heroes.html' };
+function goPage(url) { location.replace(url); }
+function askName(cb) {
+  if (settings.name) return cb(settings.name);
+  openModal(`<h2>What's your name?</h2><p class="help">Shown to the people you play against.</p>
+    <input id="nmIn" maxlength="24" placeholder="Your name" autocomplete="off">
+    <div class="btns" style="margin-top:12px;justify-content:flex-start"><button class="primary" id="nmOk">Continue</button></div>`);
+  const go = () => { const v = $('#nmIn').value.trim(); if (!v) { toast('Enter a name'); return; } settings.name = v; saveSettings(); closeModal(); cb(v); };
+  $('#nmOk').onclick = go; $('#nmIn').onkeydown = e => { if (e.key === 'Enter') go(); }; $('#nmIn').focus();
+}
+
+// ---------- challenge links: ?c=<base64url JSON> {v:1, g:'hh', m, t, r:[[pano, heading, playerId]×5], s:[[name,[pts×5]],…]} ----------
+function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function b64d(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return JSON.parse(decodeURIComponent(escape(atob(s)))); }
+let pendingChal = null, pendingRoom = null;
+function readUrl() {
+  const p = new URLSearchParams(location.search);
+  try {
+    const c = p.get('c');
+    if (c) {
+      const ch = b64d(c);
+      if (!ch || !Array.isArray(ch.r) || ch.r.length !== ROUNDS) throw 0;
+      const g = ch.g || 'geo';   // links without a game are Geo Clue links
+      if (g !== 'hh') { if (!has(GAME_PAGES, g)) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
+      if (!ch.r.every(x => Array.isArray(x) && typeof x[0] === 'string' && has(BY_ID, x[2]))) throw 0;   // unknown player = broken link
+      ch.m = has(MOVES, ch.m) ? ch.m : 'move';
+      ch.t = Math.max(0, Math.min(600, Math.round(+ch.t || 0)));
+      // scores come from whoever made the link: keep only [name, 5 numbers 0-5000] entries
+      ch.s = (Array.isArray(ch.s) ? ch.s : []).filter(x => Array.isArray(x) && Array.isArray(x[1]) && x[1].length === ROUNDS)
+        .map(([n, p]) => [String(n).slice(0, 24), p.map(v => Math.max(0, Math.min(5000, Math.round(+v || 0))))]);
+      pendingChal = ch;
+    }
+  } catch (e) { toast('That challenge link looks broken'); }
+  const rm = p.get('room'); if (rm) pendingRoom = rm.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+}
+function chalId(ch) { return hash(ch.r.map(x => x[0]).join('|') + ch.m + ch.t).toString(36); }
+function myName() { return settings.name || 'You'; }
+function mergedScores() {
+  const prev = (game.chal && game.chal.s) || [];
+  return [...prev.filter(x => x[0] !== myName()), [myName(), game.rounds.map(r => r.pts || 0)]];
+}
+function shareChallenge() {
+  askName(() => {
+    const ch = { v: 1, g: 'hh', m: game.move, t: game.timer || 0, r: game.rounds.map(r => [r.pano, r.heading, r.ans]), s: mergedScores() };
+    const link = location.origin + location.pathname + '?c=' + b64e(ch);
+    // remember my own run under this challenge, so a link sent back opens straight to the leaderboard
+    if (game.mode !== 'chal') LS.set('hh:c:' + chalId(ch), Object.assign({}, game, { mode: 'chal', key: 'chal', cid: chalId(ch), phase: 'final', chal: { s: [] } }));
+    openModal(`<h2>⚔ ${game.mode === 'chal' ? 'Send your results back' : 'Challenge a friend'}</h2>
+      <p class="help">Send this link by text or email. Whoever opens it plays the same 5 hometowns and sees ${game.mode === 'chal' ? 'everyone\'s scores so far' : 'your score'}. When they finish they can send their results back the same way.</p>
+      <input id="chLink" readonly value="${esc(link)}">
+      <div class="btns" style="margin-top:12px;justify-content:flex-start"><button class="primary" id="chCopy">Copy link</button></div>`);
+    $('#chCopy').onclick = () => copy(link);
+    $('#chLink').onclick = e => e.target.select();
+  });
+}
+async function startChallenge(ch) {
+  hideHome();
+  const cid = chalId(ch), saved = LS.get('hh:c:' + cid, null);
+  if (saved) saved.chal = { s: ch.s };
+  if (saved && saved.phase === 'final') { LS.set('hh:c:' + cid, saved); return showSavedFinal(saved); }
+  if (capBlocks(saved)) { showCapMsg(); return; }
+  if (!(await boot())) return;
+  if (saved) { game = saved; save(); return resume(); }
+  showMsg('Loading the challenge…');
+  const rounds = [];
+  try {
+    for (const [panoId, heading, ans] of ch.r) {
+      const { data } = await sv.getPanorama({ pano: panoId });   // metadata lookup: free
+      rounds.push({ pano: panoId, heading: +heading || 0, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(), ans, pts: null });
+    }
+  } catch (e) { showMsg('Couldn\'t load one of the challenge hometowns. The link may be broken or the imagery was removed.'); return; }
+  game = { mode: 'chal', key: 'chal', cid, move: ch.m, timer: ch.t, rounds, idx: 0, phase: 'play', chal: { s: ch.s } };
+  save(); resume();
+}
+function chalBoard() {
+  const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + (+x || 0), 0) })).sort((a, b) => b.t - a.t);
+  return `<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">⚔ Challenge leaderboard</div>
+    <div class="rounds">${rows.map((x, i) => `<div><span>${i === 0 ? '🏆' : (i + 1) + '.'} ${esc(x.n)}${x.n === myName() ? ' (you)' : ''}
+      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => ((+v || 0) / 1000).toFixed(1) + 'k').join(' · ')}</span></span><b>${x.t.toLocaleString()}</b></div>`).join('')}</div>`;
+}
+function renderBanner() {
+  const b = $('#chalBanner');
+  if (pendingRoom) {
+    b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>🎮 You're invited to live room ${esc(pendingRoom)}</b><div class="d">Everyone plays the same rounds at the same time</div></div>
+      <button class="primary" id="hJoinInv">Join</button></div>`;
+    $('#hJoinInv').onclick = needKey(() => joinRoom(pendingRoom));
+  } else if (pendingChal) {
+    const sc = pendingChal.s.map(([n, p]) => [n, p.reduce((a, x) => a + (+x || 0), 0)]).sort((a, c) => c[1] - a[1]);
+    const done = LS.get('hh:c:' + chalId(pendingChal), null);
+    b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>⚔ ${sc.length ? esc(sc.map(x => x[0]).join(', ')) + (sc.length === 1 ? ' challenged you' : ' are in this challenge') : 'You have a challenge'}</b>
+      <div class="d">${sc.length ? 'Top score ' + sc[0][1].toLocaleString() + ' · ' : ''}${ruleLabel(pendingChal.m, pendingChal.t)}</div></div>
+      <button class="primary" id="hChal">${done ? (done.phase === 'final' ? 'Results' : 'Continue') : 'Accept'}</button></div>`;
+    $('#hChal').onclick = needKey(() => startChallenge(pendingChal));
+  } else b.innerHTML = '';
+}
+
+// ---------- live rooms: ?room=CODE, polled every 2 s ----------
+let live = null, pollId = null;
+function sessId() {   // per browser tab, survives reloads; lets two tabs be two players
+  try { let id = sessionStorage.getItem('gc:sid'); if (!id) { id = 's' + Math.random().toString(36).slice(2, 10); sessionStorage.setItem('gc:sid', id); } return id; }
+  catch (e) { return 'x' + hash(navigator.userAgent).toString(36); }
+}
+const NODB_MSG = 'Live rooms need a free database. In Vercel open <b>clue-games → Storage → Create Database → Upstash for Redis</b> (free plan), connect it to this project, then redeploy.';
+async function api(action, extra = {}) {
+  const r = await fetch('api/room', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ action, code: live && live.code, id: sessId(), name: settings.name }, extra)) });
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (r.status === 503 && j.error === 'nodb') throw new Error('NODB');
+  if (r.status === 404 && !j.error) throw new Error('Live rooms need the hosted site (they don\'t work from a file on your computer).');
+  if (!r.ok) throw new Error(j.error || 'Server error ' + r.status);
+  return j;
+}
+function apiError(e) { if (e.message === 'NODB') openModal(`<h2>Live rooms aren't set up yet</h2><p class="help">${NODB_MSG}</p>`); else toast(e.message); }
+function createRoom() {
+  askName(async () => {
+    hideHome();
+    if (overCap()) { showCapMsg(); return; }
+    if (!(await boot())) return;
+    showMsg('Finding 5 hometowns…');
+    let rounds;
+    try { rounds = await makeRounds(randomSeed()); }
+    catch (e) { showMsg(esc(e.message)); return; }
+    try {
+      live = { code: null };
+      const j = await api('create', { settings: { game: 'hh', move: settings.liveMove, timer: +settings.liveTimer },
+        rounds: rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, ans: r.ans })) });
+      enterRoom(j.code);
+    } catch (e) { live = null; showHome(); apiError(e); }
+  });
+}
+// a room made for another game (or an old Geo Clue room): hand over to that game's page (returns true if redirected)
+function otherGame(g, code) {
+  g = g || 'geo';
+  if (g === 'hh') return false;
+  goPage((has(GAME_PAGES, g) ? GAME_PAGES[g] : GAME_PAGES.geo) + '?room=' + code); return true;
+}
+function joinRoom(code) {
+  code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 4) { toast('Enter the 4-letter room code'); return; }
+  askName(async () => {
+    if (overCap()) { hideHome(); showCapMsg(); return; }
+    live = { code };
+    let jr; try { jr = await api('join'); } catch (e) { live = null; apiError(e); return; }
+    if (otherGame(jr && jr.game, code)) return;
+    hideHome();
+    if (!(await boot())) return;
+    enterRoom(code);
+  });
+}
+function enterRoom(code) {
+  live = { code, round: -1, data: null, errs: 0, skew: 0, busy: false, resultSig: '', finalShown: false };
+  pendingRoom = null;
+  try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  hideMsg(); pollRoom();
+  clearInterval(pollId); pollId = setInterval(pollRoom, 2000);
+}
+function leaveRoom() {
+  clearInterval(pollId); pollId = null; live = null;
+  $('#lobby').classList.remove('on');
+  try { history.replaceState(null, '', location.pathname); } catch (e) {}
+}
+const isHost = () => live && live.data && live.data.room.hostId === sessId();
+function roundOver(d) {
+  const room = d.room, r = room.round, ids = Object.keys(d.players);
+  if (room.forceEnd === r) return true;
+  if (ids.length && ids.every(id => d.guesses[r + ':' + id])) return true;
+  return !!room.settings.timer && d.now - room.startedAt > room.settings.timer * 1000 + 3000;
+}
+function setupLiveGame(room) {
+  game = { mode: 'live', key: 'live', code: room.code, move: has(MOVES, room.settings.move) ? room.settings.move : 'move', timer: room.settings.timer,
+    rounds: room.rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, ans: r.ans, pts: null })), idx: room.round, phase: 'play' };
+  live.round = -1;
+}
+function syncMine(d) {
+  game.rounds.forEach((r, i) => { const g = d.guesses[i + ':' + sessId()]; if (g) { r.pts = g.pts; r.km = g.km; r.guess = g.lat == null ? null : { lat: g.lat, lng: g.lng }; } });
+}
+async function pollRoom() {
+  if (!live || live.busy) return;
+  live.busy = true;
+  let d;
+  try { d = await api('get'); live.errs = 0; }
+  catch (e) { if (live && ++live.errs >= 5) { leaveRoom(); showHome(); apiError(e); } return; }
+  finally { if (live) live.busy = false; }
+  if (!live || d.room.code !== live.code) return;
+  live.data = d; live.skew = d.now - Date.now();
+  const room = d.room;
+  if (otherGame(room.settings.game, room.code)) { clearInterval(pollId); return; }
+  if (room.state === 'lobby') return renderLobby(d);
+  $('#lobby').classList.remove('on');
+  if (!game || game.mode !== 'live' || game.code !== room.code) setupLiveGame(room);
+  syncMine(d);
+  if (room.state === 'final') { clearInterval(pollId); return showLiveFinal(d); }
+  const r = room.round;
+  if (live.round !== r) { live.round = r; live.resultSig = ''; game.idx = r; game.phase = d.guesses[r + ':' + sessId()] ? 'wait' : 'play'; showRound(); }
+  if (roundOver(d)) { game.phase = 'result'; showLiveResult(d); }
+  else if (game.phase === 'wait' || d.guesses[r + ':' + sessId()]) { game.phase = 'wait'; showWaiting(d); }
+  else hudLive(d);
+}
+function hudLive(d) {
+  hud();
+  const r = d.room.round, ids = Object.keys(d.players), done = ids.filter(id => d.guesses[r + ':' + id]).length;
+  $('#hMode').innerHTML = `Room <b>${esc(d.room.code)}</b> · ${done}/${ids.length} guessed`;
+}
+async function postLiveGuess(r) {
+  try { await api('guess', { round: game.idx, pts: r.pts || 0, km: r.km, lat: r.guess ? r.guess.lat : null, lng: r.guess ? r.guess.lng : null }); }
+  catch (e) { toast(e.message); }
+  pollRoom();
+}
+function showWaiting(d) {
+  clearInterval(timerId); $('#timer').hidden = true;
+  hudLive(d);
+  const r = d.room.round, ids = Object.keys(d.players), done = ids.filter(id => d.guesses[r + ':' + id]).length;
+  if (guessMarker) guessMarker.setMap(map);
+  $('#guessBtn').disabled = true; $('#guessBtn').textContent = 'Guess locked in ✓';
+  $('#resPanel').innerHTML = `<h2 style="font-size:20px">Guess locked in ✓</h2><div class="dist">Waiting for the others… <b>${done}/${ids.length}</b> guessed</div>
+    ${isHost() ? '<div class="btns"><button id="endRoundBtn">End round now</button></div>' : ''}`;
+  $('#resPanel').classList.add('on');
+  if ($('#endRoundBtn')) $('#endRoundBtn').onclick = () => api('endround').then(pollRoom).catch(apiError);
+}
+function playerRows(d, r) {
+  return Object.keys(d.players).map((id, i) => ({ id, name: d.players[id].name, color: COLORS[i % COLORS.length], g: d.guesses[r + ':' + id] || null, me: id === sessId() }));
+}
+function standings(d, upto) {
+  return Object.keys(d.players).map((id, i) => {
+    let tot = 0; const per = [];
+    for (let k = 0; k <= upto; k++) { const p = (d.guesses[k + ':' + id] || {}).pts || 0; tot += p; per.push(p); }
+    return { id, name: d.players[id].name, color: COLORS[i % COLORS.length], tot, per, me: id === sessId() };
+  }).sort((a, b) => b.tot - a.tot);
+}
+function showLiveResult(d) {
+  const room = d.room, r = room.round, sig = r + '|' + Object.keys(d.guesses).length + '|' + Object.keys(d.players).length;
+  if (live.resultSig === sig) return;
+  live.resultSig = sig;
+  const R = game.rounds[r], p = playerOf(R.ans);
+  const rows = playerRows(d, r);
+  hudLive(d);
+  revealMap(R, rows.filter(x => x.g && x.g.lat != null).map(x => ({ pos: { lat: x.g.lat, lng: x.g.lng }, color: x.color, label: String(x.name).slice(0, 1).toUpperCase() })));
+  rows.sort((a, c) => ((c.g || {}).pts || 0) - ((a.g || {}).pts || 0));
+  const last = r >= ROUNDS - 1;
+  $('#resPanel').innerHTML = `<div style="color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:1px">Round ${r + 1} of ${ROUNDS} · Room ${esc(room.code)}</div>
+    ${whoHTML(p)}
+    <div class="where"><a href="${mapsLink(R)}" target="_blank">open in Google Maps</a></div>
+    <div class="rounds">${rows.map(x => `<div><span><span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}</span><span>${x.g && x.g.km != null ? fmtDist(x.g.km) : 'no pin'} · <b>${((x.g || {}).pts || 0).toLocaleString()}</b></span></div>`).join('')}</div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:2px">Total after round ${r + 1}</div>
+    <div class="rounds">${standings(d, r).map((x, i) => `<div><span>${i + 1}. ${esc(x.name)}${x.me ? ' (you)' : ''}</span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div>
+    <div class="btns">${isHost() ? `<button class="primary" id="liveNext">${last ? 'Show final results' : 'Next round →'}</button>` : '<span class="help">Waiting for the host to continue…</span>'}</div>`;
+  $('#resPanel').classList.add('on');
+  if ($('#liveNext')) $('#liveNext').onclick = () => { $('#liveNext').disabled = true; api('next').then(pollRoom).catch(apiError); };
+}
+function showLiveFinal(d) {
+  if (live.finalShown) return;
+  live.finalShown = true;
+  game.idx = ROUNDS - 1; game.phase = 'final'; hud(); $('#hMode').innerHTML = `Room <b>${esc(d.room.code)}</b> · final`;
+  clearInterval(timerId); $('#timer').hidden = true;
+  $('#block').classList.remove('on'); $('#resPanel').classList.remove('on');
+  const st = standings(d, ROUNDS - 1);
+  $('#endBody').innerHTML = `<div class="hicon">🏆</div>
+    <div class="endtitle">${esc(st[0] ? st[0].name : '')} wins!</div>
+    <p class="tag" style="margin:0">Final results · Room ${esc(d.room.code)} · ${modeLabel()}</p>
+    <div class="endbox"><div class="rounds">${st.map((x, i) => `<div><span>${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1) + '.'} <span style="color:${x.color}">●</span> ${esc(x.name)}${x.me ? ' (you)' : ''}
+      <span style="color:var(--muted);font-size:12px"> ${x.per.map(v => (v / 1000).toFixed(1) + 'k').join(' · ')}</span></span><b>${x.tot.toLocaleString()}</b></div>`).join('')}</div></div>
+    <div class="endbox">${roundList(game.rounds, false)}</div>
+    <div class="hbtns"><button class="primary" id="liveCopy">Copy results</button><button id="liveHome">⌂ Back to home</button></div>`;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
+  $('#liveCopy').onclick = () => copy(`Hometown Heroes live room ${d.room.code}\n` + st.map((x, i) => `${i + 1}. ${x.name} — ${x.tot.toLocaleString()}`).join('\n'));
+  $('#liveHome').onclick = showHome;
+}
+function renderLobby(d) {
+  const room = d.room, ids = Object.keys(d.players), host = room.hostId === sessId();
+  const sig = JSON.stringify([ids, ids.map(id => d.players[id].name), room.settings]);
+  if (live.lobbySig === sig && $('#lobby').classList.contains('on')) return;
+  live.lobbySig = sig;
+  const opt = (list, val) => list.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join('');
+  const link = location.origin + location.pathname + '?room=' + room.code;
+  $('#lobbyBody').innerHTML = `<div class="hicon">🏠</div><div class="hlogo small">Hometown<span>Heroes</span> · Live room</div>
+    <p class="tag" style="margin:0">Room code</p><div class="rcode">${esc(room.code)}</div>
+    <div style="display:flex;gap:6px;margin:10px 0 16px"><input readonly value="${esc(link)}" id="lbLink"><button id="lbCopy">Copy invite</button></div>
+    <div class="today" style="display:block"><b>Players (${ids.length}/10)</b>
+      <div class="rounds" style="margin:8px 0 0">${ids.map((id, i) => `<div><span><span style="color:${COLORS[i % COLORS.length]}">●</span> ${esc(d.players[id].name)}${id === room.hostId ? ' 👑' : ''}${id === sessId() ? ' (you)' : ''}</span></div>`).join('')}</div></div>
+    ${host ? `<div class="grid2" style="text-align:left;margin:0 0 6px">
+        <div><div class="help">Movement</div><select id="lbMove">${opt(Object.entries(MOVES), room.settings.move)}</select></div>
+        <div><div class="help">Round timer</div><select id="lbTimer">${opt(LIVE_TIMERS.map(t => [t, timerName(t)]), room.settings.timer)}</select></div></div>
+      <p class="help">5 rounds · 5 hometowns</p>`
+    : `<p class="help">${ruleLabel(room.settings.move, room.settings.timer)} · 5 rounds</p>`}
+    <div class="hbtns">${host ? `<button class="primary" id="lbStart">Start game · ${ids.length} player${ids.length > 1 ? 's' : ''}</button>` : '<button disabled>Waiting for the host to start…</button>'}
+      <button id="lbLeave">Leave room</button></div>`;
+  $('#lobby').classList.add('on');
+  $('#lbCopy').onclick = () => copy(link);
+  $('#lbLink').onclick = e => e.target.select();
+  if ($('#lbStart')) $('#lbStart').onclick = () => { $('#lbStart').disabled = true; api('start').then(pollRoom).catch(apiError); };
+  const pushSettings = () => api('settings', { settings: { move: $('#lbMove').value, timer: +$('#lbTimer').value } }).then(pollRoom).catch(apiError);
+  if ($('#lbMove')) { $('#lbMove').onchange = pushSettings; $('#lbTimer').onchange = pushSettings; }
+  $('#lbLeave').onclick = () => { leaveRoom(); showHome(); };
+}
+$('#hCreate').onclick = needKey(createRoom);
+$('#hJoin').onclick = needKey(() => joinRoom($('#hCode').value));
+$('#hCode').onkeydown = e => { if (e.key === 'Enter') $('#hJoin').click(); };
+
+// ---------- init ----------
+readUrl();
+showHome();
+loadServerKey().then(() => { if (homeOn()) renderHome(); });
+</script>
+</body>
+</html>

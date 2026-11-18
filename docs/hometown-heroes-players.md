@@ -6,7 +6,7 @@ How to read it:
 - **Kraken?** = played at least 20 games for Seattle (2021-22 to now).
 - **Confidence**: high = a team, junior/college or news source says this is where he grew up; medium = birthplace or a single/conflicting source, so please eyeball it before launch.
 - Coordinates are the town centre (Nominatim/OpenStreetMap), 4 decimals; a few were corrected by hand where the lookup picked the wrong place (Larsson, Connor, Kane) or found nothing.
-- Rows marked ?? are in the second table only and are NOT in the PLAYERS array.
+- Rows marked ?? (the four in the main table, and everyone in the second table) are NOT in the PLAYERS array.
 - Russia, Belarus, Kazakhstan etc. were left out on purpose.
 
 ## Table
@@ -41,8 +41,8 @@ How to read it:
 | 26 | Mason Appleton | Detroit Red Wings | Yes | Green Bay, WI | - | 44.5126 | -88.0126 | https://msuspartans.com/news/2015/9/25/Meet_the_Freshman_Mason_Appleton | high |
 | 27 | Brian Dumoulin | Los Angeles Kings | Yes | Biddeford, ME | - | 43.4926 | -70.4534 | https://www.pressherald.com/2018/06/25/local-hero-gives-back/ | high |
 | 28 | Berkly Catton | Seattle Kraken | Yes | Saskatoon, SK | - | 52.1318 | -106.6608 | https://neutralzone.com/player/Berkly-Catton-53003 | medium |
-| 29 | Cale Fleury | Seattle Kraken | Yes | Carlyle, SK (family moved to Calgary ~2002) | - | 49.6338 | -102.2670 | https://www.sasktoday.ca/south/local-sports/the-fleurys-are-brothers-and-nhl-teammates-5027824 | medium |
-| 30 | Haydn Fleury | Winnipeg Jets | Yes | Carlyle, SK (family moved to Calgary ~2002) | - | 49.6338 | -102.2670 | https://www.sasktoday.ca/south/local-sports/the-fleurys-are-brothers-and-nhl-teammates-5027824 | medium |
+| 29 | Cale Fleury | Seattle Kraken | Yes | Carlyle, SK (family moved to Calgary ~2002) | - | 49.6338 | -102.2670 | https://www.sasktoday.ca/south/local-sports/the-fleurys-are-brothers-and-nhl-teammates-5027824 | ?? (doubtful grew-up town — left out pending owner check) |
+| 30 | Haydn Fleury | Winnipeg Jets | Yes | Carlyle, SK (family moved to Calgary ~2002) | - | 49.6338 | -102.2670 | https://www.sasktoday.ca/south/local-sports/the-fleurys-are-brothers-and-nhl-teammates-5027824 | ?? (doubtful grew-up town — left out pending owner check) |
 | 31 | Josh Mahura | Seattle Kraken | Yes | St. Albert, AB | - | 53.6332 | -113.6288 | https://www.stalbertgazette.com/local-news/mahura-shares-the-stanley-cup-with-st-albert-9252193 | high |
 | 32 | Bobby McMann | Seattle Kraken | Yes | Wainwright, AB | - | 52.8403 | -110.8514 | https://thehockeywriters.com/docs/bobby-mcmann/ | high |
 | 33 | Jacob Melanson | Seattle Kraken | Yes | Amherst, NS | - | 45.8193 | -64.2334 | https://www.nhl.com/kraken/news/summer-training-amherst-nova-scotia-jacob-melanson-cj-jackson-ft | high |
@@ -67,7 +67,7 @@ How to read it:
 | 52 | Miro Heiskanen | Dallas Stars | No | Espoo, Finland | - | 60.2050 | 24.6560 | https://api-web.nhle.com/v1/roster/DAL/current | medium |
 | 53 | Rasmus Dahlin | Buffalo Sabres | No | Lidkoping, Sweden | - | 58.5053 | 13.1577 | https://api-web.nhle.com/v1/roster/BUF/current | medium |
 | 54 | Aleksander Barkov | Florida Panthers | No | Tampere, Finland | - | 61.4978 | 23.7616 | https://api-web.nhle.com/v1/roster/FLA/current | medium |
-| 55 | Matthew Tkachuk | Florida Panthers | No | Creve Coeur, MO (some sources: Chesterfield, MO) | Scottsdale, AZ | 38.6613 | -90.4424 | https://en.wikipedia.org/wiki/Matthew_Tkachuk | medium |
+| 55 | Matthew Tkachuk | Florida Panthers | No | Creve Coeur, MO (some sources: Chesterfield, MO) | Scottsdale, AZ | 38.6613 | -90.4424 | https://en.wikipedia.org/wiki/Matthew_Tkachuk | ?? (doubtful grew-up town — left out pending owner check) |
 | 56 | Filip Forsberg | Nashville Predators | No | Ostervala, Sweden | - | 60.1833 | 17.2000 | https://api-web.nhle.com/v1/roster/NSH/current | medium |
 | 57 | Roman Josi | Nashville Predators | No | Bern, Switzerland | - | 46.9485 | 7.4522 | https://api-web.nhle.com/v1/roster/NSH/current | medium |
 | 58 | Nico Hischier | New Jersey Devils | No | Naters, Switzerland | - | 46.3243 | 7.9884 | https://api-web.nhle.com/v1/roster/NJD/current | medium |
@@ -91,7 +91,7 @@ How to read it:
 | 76 | Nick Suzuki | Montreal Canadiens | No | London, ON | - | 42.9837 | -81.2496 | https://api-web.nhle.com/v1/roster/MTL/current | medium |
 | 77 | Jonathan Huberdeau | Calgary Flames | No | Saint-Jerome, QC | - | 45.7804 | -74.0036 | https://api-web.nhle.com/v1/roster/CGY/current | medium |
 | 78 | Tom Wilson | Washington Capitals | No | Toronto, ON | - | 43.6535 | -79.3839 | https://api-web.nhle.com/v1/roster/WSH/current | medium |
-| 79 | Juraj Slafkovsky | Montreal Canadiens | No | Kosice, Slovakia | - | 48.7164 | 21.2611 | https://api-web.nhle.com/v1/roster/MTL/current | medium |
+| 79 | Juraj Slafkovsky | Montreal Canadiens | No | Kosice, Slovakia | - | 48.7164 | 21.2611 | https://api-web.nhle.com/v1/roster/MTL/current | ?? (doubtful grew-up town — left out pending owner check) |
 
 ### Left out of PLAYERS (?? or team unverified)
 
@@ -105,7 +105,7 @@ How to read it:
 | Tomas Tatar | (not on a current NHL roster) | Yes | high (town) / team unknown | Dubnica nad Vahom, Slovakia (born Ilava) | current/last team not checked. Source https://www.nhlpa.com/news/my-hometown-tomas-tatar |
 | Justin Schultz | (not on a current NHL roster) | Yes | high (town) / team unknown | West Kelowna, BC (born Kelowna) | current/last team not checked. Source https://www.hockeycanada.ca/news/down-in-the-valley-out-on-the-ice-okanagan-unsuspecting-hockey-hotbed |
 
-Counts: 41 Kraken, 38 league, 7 left out.
+Counts: 39 Kraken, 36 league in PLAYERS (75); 11 left out (4 marked ?? in the main table + 7 below).
 
 ## Ready to paste (Task 6)
 
@@ -139,8 +139,6 @@ const PLAYERS = [
   { id: 'appleton', name: 'Mason Appleton', team: 'Detroit Red Wings', town: 'Green Bay, WI', lat: 44.5126, lng: -88.0126, kraken: true },
   { id: 'dumoulin', name: 'Brian Dumoulin', team: 'Los Angeles Kings', town: 'Biddeford, ME', lat: 43.4926, lng: -70.4534, kraken: true },
   { id: 'catton', name: 'Berkly Catton', team: 'Seattle Kraken', town: 'Saskatoon, SK', lat: 52.1318, lng: -106.6608, kraken: true },
-  { id: 'cfleury', name: 'Cale Fleury', team: 'Seattle Kraken', town: 'Carlyle, SK', lat: 49.6338, lng: -102.2670, kraken: true },
-  { id: 'hfleury', name: 'Haydn Fleury', team: 'Winnipeg Jets', town: 'Carlyle, SK', lat: 49.6338, lng: -102.2670, kraken: true },
   { id: 'mahura', name: 'Josh Mahura', team: 'Seattle Kraken', town: 'St. Albert, AB', lat: 53.6332, lng: -113.6288, kraken: true },
   { id: 'mcmann', name: 'Bobby McMann', team: 'Seattle Kraken', town: 'Wainwright, AB', lat: 52.8403, lng: -110.8514, kraken: true },
   { id: 'melanson', name: 'Jacob Melanson', team: 'Seattle Kraken', town: 'Amherst, NS', lat: 45.8193, lng: -64.2334, kraken: true },
@@ -165,7 +163,6 @@ const PLAYERS = [
   { id: 'heiskanen', name: 'Miro Heiskanen', team: 'Dallas Stars', town: 'Espoo, Finland', lat: 60.2050, lng: 24.6560, kraken: false },
   { id: 'dahlin', name: 'Rasmus Dahlin', team: 'Buffalo Sabres', town: 'Lidkoping, Sweden', lat: 58.5053, lng: 13.1577, kraken: false },
   { id: 'barkov', name: 'Aleksander Barkov', team: 'Florida Panthers', town: 'Tampere, Finland', lat: 61.4978, lng: 23.7616, kraken: false },
-  { id: 'tkachuk', name: 'Matthew Tkachuk', team: 'Florida Panthers', town: 'Creve Coeur, MO', lat: 38.6613, lng: -90.4424, kraken: false },
   { id: 'forsberg', name: 'Filip Forsberg', team: 'Nashville Predators', town: 'Ostervala, Sweden', lat: 60.1833, lng: 17.2000, kraken: false },
   { id: 'josi', name: 'Roman Josi', team: 'Nashville Predators', town: 'Bern, Switzerland', lat: 46.9485, lng: 7.4522, kraken: false },
   { id: 'hischier', name: 'Nico Hischier', team: 'New Jersey Devils', town: 'Naters, Switzerland', lat: 46.3243, lng: 7.9884, kraken: false },
@@ -189,6 +186,5 @@ const PLAYERS = [
   { id: 'suzuki', name: 'Nick Suzuki', team: 'Montreal Canadiens', town: 'London, ON', lat: 42.9837, lng: -81.2496, kraken: false },
   { id: 'huberdeau', name: 'Jonathan Huberdeau', team: 'Calgary Flames', town: 'Saint-Jerome, QC', lat: 45.7804, lng: -74.0036, kraken: false },
   { id: 'wilson', name: 'Tom Wilson', team: 'Washington Capitals', town: 'Toronto, ON', lat: 43.6535, lng: -79.3839, kraken: false },
-  { id: 'slafkovsky', name: 'Juraj Slafkovsky', team: 'Montreal Canadiens', town: 'Kosice, Slovakia', lat: 48.7164, lng: 21.2611, kraken: false },
 ];
 ```
