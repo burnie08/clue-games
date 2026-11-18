@@ -75,7 +75,7 @@ async function geoNoDb(){
 }
 async function world(){
  const {w,d,src}=make('world-clue.html');
- w.eval(src+';window.__t={g:()=>game,guess,search,draw:drawShape,by:BY,pool:answerPool,all:COUNTRIES.length};');
+ w.eval(src+';window.__t={g:()=>game,guess,search,draw:drawShape,by:BY,pool:answerPool,all:COUNTRIES.length,route:routeVia,pair:hopPair,mb:mulberry32,drawMap:drawHopMap,unl:startUnlimited};');
  await sleep(50);
  const opened=()=>d.querySelectorAll('.cover.open').length;
  console.log('WORLD start: home on',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| puzzles:',[...d.querySelectorAll('#hPuzzles button')].map(b=>b.textContent+(b.disabled?'(off)':'')).join(' '));
@@ -124,5 +124,43 @@ async function world(){
  w.__t.guess(sa); await sleep(800);
  console.log('      win in 6 -> end',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'| share:',(d.querySelector('#eShare').click(),await sleep(10),JSON.stringify(w.__copied)));
  const tiny=w.__t.pool().filter(c=>w.__t.by[c].area<1000); console.log('      shape answer pool',w.__t.pool().length,'of',w.__t.all,'| tiny in pool:',tiny.length);
+ // ---- Border Hop ----
+ d.querySelector('#eHome').click(); d.querySelector('#hPuzzles button[data-p=hop]').click();
+ console.log('WORLD hop tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| btns:',d.querySelector('#hDaily').textContent,'/',d.querySelector('#hUnl').textContent);
+ d.querySelector('#hDaily').click(); await sleep(50);
+ let h=w.__t.g(); const nm=c=>w.__t.by[c].name;
+ console.log('      daily:',nm(h.start),'->',nm(h.answer),'| fewest',h.min,'| limit',d.querySelector('#maxG').textContent,'| top:',d.querySelector('#hopbox').textContent.replace(/\s+/g,' ').trim());
+ const best=w.__t.route(h.start,h.answer); console.log('      a best route:',best.map(nm).join(' > '));
+ w.__t.guess('jp'); w.__t.guess(h.start); w.__t.guess(best[0]);
+ console.log('      after Japan + start + first stop: rows',[...d.querySelectorAll('.hrow')].map(r=>r.textContent.replace(/\s+/g,' ').trim()).join(' | '),'| count',h.guesses.length);
+ for(const c of best.slice(1)) w.__t.guess(c); await sleep(1500);
+ console.log('      linked -> won',h.won,'| end',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'| route shown:',d.querySelector('#endBody .route').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      share:',JSON.stringify(w.__copied));
+ d.querySelector('#eHome').click(); console.log('      home hop stats:',d.querySelector('#hStatsRow').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#hUnl').click(); await sleep(50); h=w.__t.g();
+ console.log('      unlimited:',nm(h.start),'->',nm(h.answer),'fewest',h.min,'limit',h.max);
+ for(const c of ['jp','gb','au','nz','is','cu','lk','mg','ph','id','tw','sg']) if(!h.done&&c!==h.start&&c!==h.answer) w.__t.guess(c);
+ await sleep(1500); console.log('      all islands -> done',h.done,'won',h.won,'| guesses',h.guesses.length,'|',d.querySelector('.endtitle').textContent,'| shown route:',d.querySelector('#endBody .route').textContent.replace(/\s+/g,' ').trim());
+ // ---- Border Hop map mode ----
+ d.querySelector('#eHome').click();
+ console.log('      home mode buttons:',[...d.querySelectorAll('#hHopMode button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '),'| shown',!d.querySelector('#hHopMode').hidden);
+ d.querySelectorAll('#hHopMode button')[2].click(); w.__t.unl(true); await sleep(50); h=w.__t.g();
+ console.log('      map on, before file loads:',d.querySelector('#hopmap').textContent,'| script tag',[...d.querySelectorAll('script')].some(s=>/world\.js/.test(s.src)),'| map bar:',[...d.querySelectorAll('#mapSeg button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '));
+ w.eval(fs.readFileSync(path.join(ROOT,'data/world.js'),'utf8')); w.__t.drawMap();
+ const lit=()=>[...d.querySelectorAll('#hopmap path[class]')].map(p=>p.getAttribute('class')).filter(c=>c!=='bg');
+ console.log('      map drawn:',nm(h.start),'->',nm(h.answer),'| paths',d.querySelectorAll('#hopmap path').length,'| lit',lit().join(','),'| labels',[...d.querySelectorAll('#hopmap text')].map(t=>t.textContent).join(', '));
+ const r2=w.__t.route(h.start,h.answer); w.__t.guess(r2[0]); w.__t.guess(h.start==='jp'||h.answer==='jp'?'gb':'jp');
+ console.log('      after 1 good + 1 island guess: lit',lit().join(','),'| labels',[...d.querySelectorAll('#hopmap text')].map(t=>t.textContent).join(', '),'| viewBox',d.querySelector('#hopmap svg').getAttribute('viewBox'));
+ for(const c of r2.slice(1)) w.__t.guess(c); await sleep(1500);
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      won',h.won,'| share:',JSON.stringify(w.__copied));
+ d.querySelector('#eBoard').click(); d.querySelector('#mapSeg button[data-v=classic]').click(); console.log('      "No map" button -> map hidden',d.querySelector('#hopmap').hidden);
+ // ---- no-borders map ----
+ d.querySelector('#eHome').click(); d.querySelectorAll('#hHopMode button')[1].click(); w.__t.unl(true); await sleep(50); h=w.__t.g();
+ console.log('      no-borders: home buttons',[...d.querySelectorAll('#hHopMode button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '),'| map shown',!d.querySelector('#hopmap').hidden,'| borders hidden',d.querySelector('#hopmap').classList.contains('nob'),'| lit',lit().join(','));
+ const r3=w.__t.route(h.start,h.answer); for(const c of r3) w.__t.guess(c); await sleep(1500);
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      won',h.won,'| borders back after end',!d.querySelector('#hopmap').classList.contains('nob'),'| share:',JSON.stringify(w.__copied));
+ // many random pairs: always 3-5 in between, and a route exists
+ const r=w.__t.mb(42); let bad=0,mins={}; for(let i=0;i<300;i++){const p=w.__t.pair(r);const rt=w.__t.route(p.start,p.answer);if(!rt||rt.length!==p.min||p.min<3||p.min>5)bad++;mins[p.min]=(mins[p.min]||0)+1;}
+ console.log('      300 random pairs: bad',bad,'| fewest-in-between counts',JSON.stringify(mins));
 }
 (async()=>{await reel();await tune();await geo();await geoNoDb();await world();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
