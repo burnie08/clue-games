@@ -113,6 +113,7 @@ nav button.on{background:var(--accent);color:#1a1300}
     <button id="bHome">⌂ Home</button>
     <button id="bStats">Stats</button>
     <button id="bHelp">?</button>
+    <button id="bMute" title="Sound on">🔊</button>
     <button id="bSettings">⚙</button>
   </nav>
 </header>
@@ -226,7 +227,7 @@ function showMsg(html) { $('#msgInner').innerHTML = html; $('#msg').classList.ad
 function hideMsg() { $('#msg').classList.remove('on'); }
 
 // ---------- settings & usage ----------
-let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000, livePack: 'world', liveMove: 'move', liveTimer: 120 }, LS.get('gc:settings', {}));
+let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000, livePack: 'world', liveMove: 'move', liveTimer: 120, music: true, sfx: true, mute: false }, LS.get('gc:settings', {}));
 const LIVE_TIMERS = [0, 30, 60, 90, 120, 180, 300];
 const timerName = t => !t ? 'No timer' : t % 60 ? t + 's' : (t / 60) + ' min';
 // Optional: a key stored in Vercel (Settings → Environment Variables → GOOGLE_MAPS_KEY) is served by /api/config,
@@ -241,6 +242,132 @@ async function loadServerKey() {
     if (j && j.googleMapsKey) { serverKey = j.googleMapsKey; if (!settings.key) settings.key = serverKey; }
   } catch (e) { /* no server config (e.g. GitHub Pages) — fine */ }
 }
+
+// ---------- sound: lo-fi music + 6 effects ----------
+// Music = recordings of real instruments (electric piano, double bass, nylon guitar) from data/lofi.js (~600 KB,
+// loaded only when a game starts with music on), played as a 13-second loop. Drums and effects are made in code.
+// Every sound fades in and out (no instant starts/stops), which is what keeps speakers from popping.
+// settings.music / settings.sfx = on/off in ⚙; settings.mute = the 🔊 button in the top bar.
+const Snd = (() => {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  let C, M, mus, fx, rev, wob, NZ, bus = null, timer = null, loading = null, buf = null;
+  const mt = m => 440 * Math.pow(2, (m - 69) / 12);
+  function init() {
+    if (C || !AC) return !!C;
+    try { C = new AC(); } catch (e) { return false; }
+    const cmp = C.createDynamicsCompressor(); cmp.threshold.value = -14; cmp.ratio.value = 3; cmp.connect(C.destination);
+    M = C.createGain(); M.connect(cmp);
+    rev = C.createConvolver();   // small room echo
+    const L = C.sampleRate * 2, ib = C.createBuffer(2, L, C.sampleRate);
+    for (let k = 0; k < 2; k++) { const d = ib.getChannelData(k); for (let i = 0; i < L; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / L, 3) * Math.min(1, i / (C.sampleRate * 0.01)); }
+    rev.buffer = ib; const rg = C.createGain(); rg.gain.value = 0.2; rev.connect(rg); rg.connect(M);
+    mus = C.createGain(); mus.gain.value = 0.35; const lp = C.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200; mus.connect(lp); lp.connect(M);
+    fx = C.createGain(); fx.gain.value = 0.8; fx.connect(M); fx.connect(rev);
+    wob = C.createGain(); wob.gain.value = 6; const o = C.createOscillator(); o.frequency.value = 0.4; o.connect(wob); o.start();   // slight tape wobble
+    NZ = C.createBuffer(1, C.sampleRate, C.sampleRate); const x = NZ.getChannelData(0); let p = 0;   // soft noise for brushes
+    for (let i = 0; i < x.length; i++) { p = 0.6 * p + 0.4 * (Math.random() * 2 - 1); x[i] = p; }
+    setMute();
+    return true;
+  }
+  // Browsers only allow sound after a tap/key press, so wake the sound up on the first one.
+  const unlock = () => { if (init() && C.state === 'suspended') C.resume(); };
+  ['pointerdown', 'keydown'].forEach(e => document.addEventListener(e, unlock, true));
+  function setMute() { if (M) M.gain.setTargetAtTime(settings.mute ? 0 : 1, C.currentTime, 0.05); }
+
+  // --- building blocks (all with fades) ---
+  function tone(d, f, t, len, o = {}) {
+    const os = C.createOscillator(); os.type = o.type || 'sine'; os.frequency.setValueAtTime(f, t);
+    if (o.to) os.frequency.exponentialRampToValueAtTime(o.to, t + len);
+    const g = C.createGain(), v = o.v || 0.2, a = o.a || 0.006;
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.setTargetAtTime(0, t + a, len / 4); g.gain.setValueAtTime(0, t + len * 1.5);
+    os.connect(g); g.connect(d); os.start(t); os.stop(t + len * 1.5 + 0.05);
+  }
+  function noise(d, t, len, v, f, q, a, f2) {
+    const n = C.createBufferSource(); n.buffer = NZ;
+    const fl = C.createBiquadFilter(); fl.type = 'bandpass'; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+    if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + len);
+    const g = C.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.setTargetAtTime(0, t + a, len / 4); g.gain.setValueAtTime(0, t + a + len + 0.2);
+    n.connect(fl); fl.connect(g); g.connect(d); n.start(t, Math.random() * 0.5); n.stop(t + a + len + 0.25);
+  }
+  function pluck(d, m, t, v) { const f = mt(m); tone(d, f, t, 1.4, { v }); tone(d, f * 2, t, 0.4, { v: v * 0.3 }); tone(d, f * 3.01, t, 0.1, { v: v * 0.12, type: 'triangle' }); }
+  function note(inst, m, t, v, len) {
+    const s = C.createBufferSource(); s.buffer = buf[inst][m]; wob.connect(s.detune);
+    const g = C.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.008);
+    g.gain.setValueAtTime(v, t + len); g.gain.setTargetAtTime(0, t + len, 0.12); g.gain.setValueAtTime(0, t + len + 1.4);
+    s.connect(g); g.connect(bus); s.start(t); s.stop(t + len + 1.5);
+  }
+
+  // --- music: 4 chords (Fmaj7, Em7, Dm7, Cmaj7), one bar each, about 75 beats a minute ---
+  const B = 0.8;
+  const CHORDS = [[53, 57, 60, 64], [52, 55, 59, 62], [50, 53, 57, 60], [48, 52, 55, 59]];
+  const BASS = [[41, 48], [40, 47], [38, 45], [36, 43]];
+  const TUNE = [[[0.5, 72, .5], [1, 69, .5], [1.5, 72, 1], [2.5, 76, 1.5]], [[0.5, 74, .5], [1, 71, 1], [2, 67, 2]],
+    [[0.5, 69, .5], [1, 72, .5], [1.5, 74, 1], [2.5, 77, 1], [3.5, 76, .5]], [[0.5, 72, 1], [1.5, 67, .5], [2, 71, 2]]];   // [beat, note, length]
+  function kick(d, t, v) {
+    const o = C.createOscillator(), g = C.createGain(); o.frequency.setValueAtTime(75, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.3);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.015); g.gain.setTargetAtTime(0, t + 0.03, 0.09); g.gain.setValueAtTime(0, t + 0.7);
+    o.connect(g); g.connect(d); o.start(t); o.stop(t + 0.75);
+  }
+  function section(t, drums) {
+    CHORDS.forEach((c, i) => {
+      const s = t + i * 4 * B;
+      c.forEach((m, j) => { note('piano', m, s + j * 0.018, 0.3, 2.3 * B); note('piano', m, s + 2.5 * B + j * 0.012, 0.15, 1.2 * B); });
+      note('bass', BASS[i][0], s, 0.75, 1.8 * B); note('bass', BASS[i][1], s + 2.5 * B, 0.55, 1.2 * B);
+      TUNE[i].forEach(([b, m, l]) => note('guitar', m, s + b * B, 0.45, l * B));
+      kick(drums, s, 0.4); kick(drums, s + 2.5 * B, 0.28);
+      [1, 3].forEach(b => noise(drums, s + b * B, 0.35, 0.06, 1500, 0.5, 0.03));   // brushed snare
+      for (let h = 0; h < 8; h++) noise(drums, s + h * B / 2 + (h % 2 ? 0.09 : 0), 0.12, h % 2 ? 0.012 : 0.018, 4500, 0.8, 0.035);   // shaker
+    });
+    return 16 * B;
+  }
+  function loadNotes() {
+    if (loading) return loading;
+    loading = new Promise((ok, no) => {
+      const go = () => {
+        const out = {}, jobs = [];
+        for (const inst in window.LOFI) { out[inst] = {}; for (const m in LOFI[inst]) {
+          const s = atob(LOFI[inst][m]), a = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i);
+          jobs.push(new Promise((y, n) => C.decodeAudioData(a.buffer, y, n)).then(b => { out[inst][m] = b; }));
+        } }
+        Promise.all(jobs).then(() => { buf = out; ok(); }, no);
+      };
+      if (window.LOFI) return go();
+      const sc = document.createElement('script'); sc.src = 'data/lofi.js'; sc.onload = go; sc.onerror = no; document.head.appendChild(sc);
+    }).catch(() => { loading = null; });
+    return loading;
+  }
+  async function startMusic() {
+    if (bus || !settings.music || !init()) return;
+    const me = bus = C.createGain(); me.connect(mus); me.connect(rev);
+    const drums = C.createGain(); const dl = C.createBiquadFilter(); dl.type = 'lowpass'; dl.frequency.value = 5000; drums.connect(dl); dl.connect(me);
+    await loadNotes();
+    if (bus !== me || !buf) { if (bus === me) bus = null; return; }
+    me.gain.setValueAtTime(0, C.currentTime); me.gain.linearRampToValueAtTime(1, C.currentTime + 2);   // fade in
+    let t = C.currentTime + 0.15;
+    const loop = () => { if (bus !== me) return; if (t < C.currentTime) t = C.currentTime + 0.1; t += section(t, drums); timer = setTimeout(loop, (t - C.currentTime - 1.5) * 1000); };
+    loop();
+  }
+  function stopMusic() {
+    clearTimeout(timer); if (!bus) return;
+    const b = bus; bus = null; b.gain.setTargetAtTime(0, C.currentTime, 0.3); setTimeout(() => b.disconnect(), 2000);
+  }
+
+  // --- the six effects ---
+  const FX = {
+    pin(d, t) { noise(d, t, 0.05, 0.22, 2500, 1, 0.006); tone(d, 180, t, 0.18, { to: 90, v: 0.32 }); },
+    lock(d, t) { pluck(d, 76, t, 0.18); pluck(d, 83, t + 0.11, 0.18); },
+    reveal(d, t) { noise(d, t, 0.7, 0.12, 300, 1, 0.4, 4000); [72, 76, 79, 84].forEach((m, i) => pluck(d, m, t + 0.6 + i * 0.02, 0.08)); },
+    great(d, t) { [67, 72, 76, 79, 84, 88].forEach((m, i) => pluck(d, m, t + i * 0.08, 0.14)); tone(d, mt(88), t + 0.45, 1.6, { v: 0.04, a: 0.05, type: 'triangle' }); },
+    far(d, t) { tone(d, mt(55), t, 0.9, { to: mt(48), v: 0.18, type: 'triangle' }); tone(d, mt(43), t + 0.05, 1, { v: 0.12 }); },
+    tick(d, t, last) { tone(d, last ? 600 : 1100, t, 0.08, { v: 0.12, a: 0.003, type: 'triangle' }); }
+  };
+  function play(name, delay = 0, arg) { if (!settings.sfx || !C || C.state !== 'running') return; FX[name](fx, C.currentTime + 0.02 + delay, arg); }
+  return { play, startMusic, stopMusic, setMute };
+})();
+// Reveal sound, then a happy chime for a close guess or a low note for a far one.
+function revealSound(pts, guessed, delay = 0) { Snd.play('reveal', delay); if (guessed && pts >= 4000) Snd.play('great', delay + 0.7); else if (!guessed || pts < 1000) Snd.play('far', delay + 0.7); }
+function muteIcon() { const b = $('#bMute'); if (b) { b.textContent = settings.mute ? '🔇' : '🔊'; b.title = settings.mute ? 'Sound off' : 'Sound on'; } }
+
 function usage() { const u = LS.get('gc:usage', null); return u && u.month === monthKey() ? u : { month: monthKey(), panos: 0, maps: 0 }; }
 function bump(kind) { const u = usage(); u[kind]++; LS.set('gc:usage', u); if (kind === 'panos') bumpShared(); }
 // Shared count for ALL players this month (everyone uses one Google key). Null if /api/usage isn't reachable.
@@ -307,6 +434,7 @@ function initMap() {
     if (!guessMarker) guessMarker = new G.Marker({ map, position: p });
     else { guessMarker.setPosition(p); guessMarker.setMap(map); }
     $('#guessBtn').disabled = false; $('#guessBtn').textContent = 'Guess';
+    Snd.play('pin');
   });
 }
 
@@ -409,6 +537,7 @@ function showRound() {
     pano.addListener('pano_changed', () => { if (game && game.phase === 'play' && game.move !== 'move' && pano.getPano() !== game.rounds[game.idx].pano) pano.setPano(game.rounds[game.idx].pano); });
   } else { pano.setOptions(opts); }
   bump('panos');
+  Snd.startMusic();
   $('#block').classList.toggle('on', nmpz);
   $('#backBtn').hidden = nmpz;
   startTimer();
@@ -421,7 +550,7 @@ function startTimer() {
   if (game.mode === 'live' && live && live.data) left = Math.max(1, Math.round(game.timer - (Date.now() + live.skew - live.data.room.startedAt) / 1000));
   const draw = () => { t.textContent = `⏱ ${left}s`; t.classList.toggle('low', left <= 10); };
   draw();
-  timerId = setInterval(() => { left--; draw(); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
+  timerId = setInterval(() => { left--; draw(); if (left > 0 && left <= 5) Snd.play('tick', 0, left === 1); if (left <= 0) { clearInterval(timerId); makeGuess(true); } }, 1000);
 }
 function makeGuess(timedOut) {
   if (!game || game.phase !== 'play') return;
@@ -431,8 +560,9 @@ function makeGuess(timedOut) {
     const p = guessMarker.getPosition(); r.guess = { lat: p.lat(), lng: p.lng() };
     r.km = distKm(r.guess, r); r.pts = scoreFor(r.km, P().size);
   } else { r.guess = null; r.km = null; r.pts = 0; if (timedOut) toast('Time\'s up!'); }
+  if (r.guess) Snd.play('lock');
   if (game.mode === 'live') { game.phase = 'wait'; if (live && live.data) showWaiting(live.data); postLiveGuess(r); return; }
-  game.phase = 'result'; save(); showResult();
+  game.phase = 'result'; save(); showResult(); revealSound(r.pts || 0, !!r.guess, r.guess ? 0.3 : 0);
 }
 function drawRoundOnMap(r, i, bounds) {
   const actual = new G.Marker({ map, position: { lat: r.lat, lng: r.lng }, label: { text: String(i + 1), color: '#fff', fontWeight: '700' },
@@ -531,6 +661,8 @@ function openSettings(first) {
     <div><label>Unlimited: map</label><select id="sPack">${Object.entries(PACKS).map(([k, p]) => `<option value="${k}" ${k === settings.pack ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
     <div><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     <div><label>Unlimited: round timer</label><select id="sTimer">${[0, 30, 60, 120, 180].map(t => `<option value="${t}" ${t === +settings.timer ? 'selected' : ''}>${t ? t + ' seconds' : 'Off'}</option>`).join('')}</select></div>
+    <div><label>Music</label><select id="sMusic"><option value="1" ${settings.music ? 'selected' : ''}>On (lo-fi)</option><option value="0" ${settings.music ? '' : 'selected'}>Off</option></select></div>
+    <div><label>Sound effects</label><select id="sSfx"><option value="1" ${settings.sfx ? 'selected' : ''}>On</option><option value="0" ${settings.sfx ? '' : 'selected'}>Off</option></select></div>
     <div><label>Distance units</label><select id="sUnits"><option value="mi" ${settings.units === 'mi' ? 'selected' : ''}>Miles</option><option value="km" ${settings.units === 'km' ? 'selected' : ''}>Kilometers</option></select></div>
   </div>
   <label>Monthly Street View limit (stops the game at this many loads; Google's free amount is 5,000)</label>
@@ -547,8 +679,9 @@ function openSettings(first) {
     if (!newKey) { toast('Enter an API key'); return; }
     const keyChanged = newKey !== keyAtOpen;
     settings.name = $('#sName').value.trim();
-    Object.assign(settings, { key: newKey, pack: $('#sPack').value, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
+    Object.assign(settings, { key: newKey, pack: $('#sPack').value, move: $('#sMove').value, timer: +$('#sTimer').value, units: $('#sUnits').value, music: $('#sMusic').value === '1', sfx: $('#sSfx').value === '1', cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
     saveSettings(); closeModal();
+    if (!settings.music) Snd.stopMusic(); else if (game && !homeOn() && game.phase !== 'final') Snd.startMusic();
     if (keyChanged && G) { location.reload(); return; }
     if (first) startDaily();
     else if (homeOn()) renderHome();
@@ -583,6 +716,8 @@ $('.logo').onclick = showHome;
 $('#bStats').onclick = openStats;
 $('#bHelp').onclick = openHelp;
 $('#bSettings').onclick = () => openSettings(!settings.key);
+$('#bMute').onclick = () => { settings.mute = !settings.mute; saveSettings(); Snd.setMute(); muteIcon(); };
+muteIcon();
 
 // ---------- home screen (Google Maps isn't loaded until you press play) ----------
 
@@ -594,7 +729,7 @@ function statsRow() {
   return statsRowHtml([v.length, 'Dailies'], [avg.toLocaleString(), 'Average'], [(v.length ? Math.max(...v) : 0).toLocaleString(), 'Best']);
 }
 function homeOn() { return $('#home').classList.contains('on'); }
-function showHome() { clearInterval(timerId); if (live) leaveRoom(); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function showHome() { clearInterval(timerId); Snd.stopMusic(); if (live) leaveRoom(); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
 function hideHome() { $('#home').classList.remove('on'); }
 function unlMatches(g) { return g && g.phase !== 'final' && g.pack === settings.pack && g.move === settings.move && g.timer === +settings.timer; }
 function renderHome() {
@@ -884,6 +1019,7 @@ function showLiveResult(d) {
   if (live.resultSig === sig) return;
   live.resultSig = sig;
   const R = game.rounds[r];
+  if (live.revealRound !== r) { live.revealRound = r; const g = d.guesses[r + ':' + sessId()]; revealSound(g ? g.pts || 0 : 0, !!(g && g.lat != null)); }
   hudLive(d); clearInterval(timerId); $('#timer').hidden = true;
   if (guessMarker) guessMarker.setMap(null);
   $('#block').classList.remove('on');
