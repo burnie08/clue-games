@@ -757,6 +757,9 @@ function readUrl() {
       const g = ch.g || 'geo';   // links without a game are Geo Clue links
       if (g !== 'ntt') { if (!GAME_PAGES[g]) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
       if (!ch.r.every(x => Array.isArray(x) && TEAM[x[2]])) throw 0;
+      // scores come from whoever made the link: keep only [name, 5 numbers 0-5000] entries
+      ch.s = (Array.isArray(ch.s) ? ch.s : []).filter(x => Array.isArray(x) && Array.isArray(x[1]) && x[1].length === ROUNDS)
+        .map(([n, p]) => [String(n).slice(0, 24), p.map(v => Math.max(0, Math.min(5000, Math.round(+v || 0))))]);
       pendingChal = ch;
     }
   } catch (e) { toast('That challenge link looks broken'); }
@@ -805,7 +808,7 @@ function chalBoard() {
   const rows = mergedScores().map(([n, p]) => ({ n, p, t: p.reduce((a, x) => a + x, 0) })).sort((a, b) => b.t - a.t);
   return `<div style="color:var(--muted);font-size:12px;margin:2px 0 4px">⚔ Challenge leaderboard</div>
     <div class="rounds">${rows.map((x, i) => `<div><span>${i === 0 ? '🏆' : (i + 1) + '.'} ${esc(x.n)}${x.n === myName() ? ' (you)' : ''}
-      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => v ? '✓' : '✗').join('')}</span></span><b>${x.t.toLocaleString()}</b></div>`).join('')}</div>`;
+      <span style="color:var(--muted);font-size:12px"> ${x.p.map(v => v ? '✓' : '✗').join('')}</span></span><b>${(+x.t || 0).toLocaleString()}</b></div>`).join('')}</div>`;
 }
 function renderBanner() {
   const b = $('#chalBanner');
@@ -817,7 +820,7 @@ function renderBanner() {
     const sc = (pendingChal.s || []).map(([n, p]) => [n, p.reduce((a, x) => a + x, 0)]).sort((a, c) => c[1] - a[1]);
     const done = LS.get('nt:c:' + chalId(pendingChal), null);
     b.innerHTML = `<div class="today" style="border-color:var(--accent)"><div><b>⚔ ${sc.length ? esc(sc.map(x => x[0]).join(', ')) + (sc.length === 1 ? ' challenged you' : ' are in this challenge') : 'You have a challenge'}</b>
-      <div class="d">${sc.length ? 'Top score ' + sc[0][1].toLocaleString() + ' · ' : ''}${ruleLabel(pendingChal.h === 1, pendingChal.m, +pendingChal.t)}</div></div>
+      <div class="d">${sc.length ? 'Top score ' + (+sc[0][1] || 0).toLocaleString() + ' · ' : ''}${ruleLabel(pendingChal.h === 1, pendingChal.m, +pendingChal.t)}</div></div>
       <button class="primary" id="hChal">${done ? (done.phase === 'final' ? 'Results' : 'Continue') : 'Accept'}</button></div>`;
     $('#hChal').onclick = needKey(() => startChallenge(pendingChal));
   } else b.innerHTML = '';

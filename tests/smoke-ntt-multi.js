@@ -159,7 +159,20 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   check('Geo Clue challenge link (no g) redirects to geo-clue.html',L.w.__went==='geo-clue.html?c='+geoLink);
   const hhLink=b64({v:1,g:'hh',r:[['a',0,'x'],['b',0,'x'],['c',0,'x'],['d',0,'x'],['e',0,'x']],s:[]});
   const L2=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+hhLink});await sleep(30);
-  check('hh challenge link redirects to hometown-heroes.html',L2.w.__went==='hometown-heroes.html?c='+hhLink);}
+  check('hh challenge link redirects to hometown-heroes.html',L2.w.__went==='hometown-heroes.html?c='+hhLink);
+  // ===== hostile / malformed scores in a link =====
+  const R5=[['P1',0,'SEA'],['P2',0,'VAN'],['P3',0,'BOS'],['P4',0,'TOR'],['P5',0,'NYR']];
+  const evil=b64({v:1,g:'ntt',h:0,m:'move',t:0,r:R5,s:[['x',['<img src=x onerror=alert(1)>',0,0,0,0]],['Ok',[1000,9999,'2',null,-5]]]});
+  const X=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+evil});await sleep(30);
+  const bx=txt(X.d.querySelector('#chalBanner'));console.log('      hostile banner:',bx);
+  check('hostile scores: no <img> injected, banner shows a number',!X.d.querySelector('#chalBanner img')&&!X.d.querySelector('img')&&/Top score 6,002/.test(bx));
+  const badS=[];
+  for(const s of [5,[null],[['a',5]],[['b',[1,2]]],'zz']){
+   const M=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:R5,s})});await sleep(30);
+   const mb=txt(M.d.querySelector('#chalBanner'));
+   if(!(on(M.d,'#home')&&txt(M.d.querySelector('#todayCard')).length&&mb.includes('You have a challenge')&&M.d.querySelector('#hMove').options.length===3))badS.push(JSON.stringify(s));
+  }
+  check('malformed scores (5, [null], bad entries, string): home still renders, banner shown'+(badS.length?' — broke on '+badS.join(' '):''),!badS.length);}
 
  console.log(bad?`${bad} FAILED`:'ALL PASS');
  process.exit(process.exitCode||0);
