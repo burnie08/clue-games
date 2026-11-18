@@ -36,6 +36,32 @@ main{max-width:560px;margin:0 auto;padding:16px}
 .shapebox svg{width:100%;height:100%;display:block}
 .shapebox path{fill:var(--accent);fill-rule:evenodd}
 .shapebox .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+#hopbox{margin-bottom:12px}
+.seg.small.hmapbar{margin:8px 0 0}
+.hopmap{position:relative;width:100%;aspect-ratio:3/2;margin-bottom:12px;border-radius:12px;overflow:hidden;border:2px solid #232733;background:#141a26}
+.hopmap svg{width:100%;height:100%;display:block}
+.hopmap .sea{fill:#141a26}
+.hopmap path{fill:#2b3140;stroke:#0f1117;stroke-width:.8px;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.hopmap path.bg{fill:#232836}
+.hopmap path.se{fill:var(--accent)}
+.hopmap path.mg{fill:var(--green)}.hopmap path.my{fill:#d9822b}.hopmap path.mx{fill:#a33}
+.hopmap circle{fill:#fff;stroke:#0f1117;stroke-width:1px;vector-effect:non-scaling-stroke}
+.hopmap text{fill:#fff;text-anchor:middle;font-weight:700;paint-order:stroke;stroke:#0f1117;stroke-width:3px;stroke-linejoin:round}
+.hopmap.nob path:not(.se):not(.mg):not(.my):not(.mx){fill:#2b3140;stroke:#2b3140}
+.hopmap .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.seg.small{margin-top:-6px}.seg.small button{padding:7px 4px;font-size:13px}
+.hends{display:flex;align-items:center;gap:10px}
+.hstop{flex:1;background:var(--panel);border:2px solid #2a2f3c;border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:6px;font-weight:700;text-align:center}
+.hstop img{width:64px;height:43px;object-fit:cover;border-radius:4px}
+.hmid{font-size:22px;text-align:center;color:var(--muted)}.hmid small{display:block;font-size:12px}
+.hrow{display:flex;align-items:center;gap:10px;border-radius:8px;padding:9px 12px;margin:6px 0;font-weight:600;animation:flip .4s both;transform-origin:center top}
+.hrow img{width:28px;height:19px;object-fit:cover;border-radius:3px}
+.hrow small{margin-left:auto;font-weight:500;opacity:.85}
+.hrow.g{background:var(--green)}.hrow.y{background:#d9822b;color:#1a1300}.hrow.x{background:#a33}
+.route{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px;margin:6px 0 12px}
+.rstop{display:inline-flex;align-items:center;gap:5px;background:var(--green);border-radius:6px;padding:4px 8px;font-size:13px;font-weight:600}
+.rstop.end{background:var(--panel2)}.rstop img{width:20px;height:14px;object-fit:cover;border-radius:2px}
+.rarr{color:var(--muted)}
 #shint{text-align:center;color:var(--muted);font-size:14px;margin:0 0 10px}#shint b{color:var(--text)}
 .flagbox .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:20px}
 
@@ -138,6 +164,8 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
   <div class="flagbox" id="flagbox"></div>
   <div class="shapebox" id="shapebox" hidden></div>
   <div id="shint" hidden></div>
+  <div id="hopbox" hidden></div>
+  <div class="hopmap" id="hopmap" hidden></div>
   <div class="searchwrap">
     <input id="q" placeholder="Type a country…" autocomplete="off">
     <div id="drop" hidden></div>
@@ -158,8 +186,9 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
     <button class="on" data-p="flag">🏳️ Flag</button>
     <button data-p="country">🔤 Country</button>
     <button data-p="shape">🗾 Shape</button>
-    <button disabled>🔗 Border Hop<small>soon</small></button>
+    <button data-p="hop">🔗 Border Hop</button>
   </div>
+  <div class="seg small" id="hHopMode" hidden></div>
   <div class="today" id="todayCard"></div>
   <div class="hbtns">
     <button class="primary" id="hDaily">Play today's flag</button>
@@ -435,6 +464,9 @@ zm:[20723965,752612,"Africa","Eastern Africa",["English"],"Lusaka",1],
 zw:[16340822,390757,"Africa","Eastern Africa",["Chibarwe","English","Kalanga","Khoisan","Ndau","Northern Ndebele","Chewa","Shona","Sotho","Tonga","Tswana","Tsonga","Venda","Xhosa","Zimbabwean Sign Language"],"Harare",1]
 };
 COUNTRIES.forEach(c => { const f = FACTS[c.code]; Object.assign(c, { pop: f[0], area: f[1], cont: f[2], sub: f[3], langs: f[4], capital: f[5], land: !!f[6] }); });
+// Land borders (from mledoze/countries). Countries with none are left out.
+const BORDERS = {af:['ir','pk','tm','uz','tj','cn'],ao:['cg','cd','zm','na'],al:['me','gr','mk','xk'],ad:['fr','es'],ae:['om','sa'],ar:['bo','br','cl','py','uy'],am:['az','ge','ir','tr'],at:['cz','de','hu','it','li','sk','si','ch'],az:['am','ge','ir','ru','tr'],bi:['cd','rw','tz'],be:['fr','de','lu','nl'],bj:['bf','ne','ng','tg'],bf:['bj','ci','gh','ml','ne','tg'],bd:['mm','in'],bg:['gr','mk','ro','rs','tr'],ba:['hr','me','rs'],by:['lv','lt','pl','ru','ua'],bz:['gt','mx'],bo:['ar','br','cl','py','pe'],br:['ar','bo','co','gy','py','pe','sr','uy','ve'],bn:['my'],bt:['cn','in'],bw:['na','za','zm','zw'],cf:['cm','td','cd','cg','ss','sd'],ca:['us'],ch:['at','fr','it','li','de'],cl:['ar','bo','pe'],cn:['af','bt','mm','in','kz','np','kp','kg','la','mn','pk','ru','tj','vn'],ci:['bf','gh','gn','lr','ml'],cm:['cf','td','cg','gq','ga','ng'],cd:['ao','bi','cf','cg','rw','ss','tz','ug','zm'],cg:['ao','cm','cf','cd','ga'],co:['br','ec','pa','pe','ve'],cr:['ni','pa'],cz:['at','de','pl','sk'],de:['at','be','cz','dk','fr','lu','nl','pl','ch'],dj:['er','et','so'],dk:['de'],do:['ht'],dz:['tn','ly','ne','mr','ml','ma'],ec:['co','pe'],eg:['il','ly','ps','sd'],er:['dj','et','sd'],es:['ad','fr','pt','ma'],ee:['lv','ru'],et:['dj','er','ke','so','ss','sd'],fi:['no','se','ru'],fr:['ad','be','de','it','lu','mc','es','ch'],ga:['cm','cg','gq'],gb:['ie'],ge:['am','az','ru','tr'],gh:['bf','ci','tg'],gn:['ci','gw','lr','ml','sn','sl'],gm:['sn'],gw:['gn','sn'],gq:['cm','ga'],gr:['al','bg','tr','mk'],gt:['bz','sv','hn','mx'],gy:['br','sr','ve'],hn:['gt','sv','ni'],hr:['ba','hu','me','rs','si'],ht:['do'],hu:['at','hr','ro','rs','sk','si','ua'],id:['tl','my','pg'],in:['bd','bt','mm','cn','np','pk'],ie:['gb'],ir:['af','am','az','iq','pk','tr','tm'],iq:['ir','jo','kw','sa','sy','tr'],il:['eg','jo','lb','ps','sy'],it:['at','fr','sm','si','ch','va'],jo:['iq','il','ps','sa','sy'],kz:['cn','kg','ru','tm','uz'],ke:['et','so','ss','tz','ug'],kg:['cn','kz','tj','uz'],kh:['la','th','vn'],kr:['kp'],xk:['al','mk','me','rs'],kw:['iq','sa'],la:['mm','kh','cn','th','vn'],lb:['il','sy'],lr:['gn','ci','sl'],ly:['dz','td','eg','ne','sd','tn'],li:['at','ch'],ls:['za'],lt:['by','lv','pl','ru'],lu:['be','fr','de'],lv:['by','ee','lt','ru'],ma:['dz','es'],mc:['fr'],md:['ro','ua'],mx:['bz','gt','us'],mk:['al','bg','gr','xk','rs'],ml:['dz','bf','gn','ci','mr','ne','sn'],mm:['bd','cn','in','la','th'],me:['al','ba','hr','xk','rs'],mn:['cn','ru'],mz:['mw','za','sz','tz','zm','zw'],mr:['dz','ml','sn'],mw:['mz','tz','zm'],my:['bn','id','th'],na:['ao','bw','za','zm'],ne:['dz','bj','bf','td','ly','ml','ng'],ng:['bj','cm','td','ne'],ni:['cr','hn'],nl:['be','de'],no:['fi','se','ru'],np:['cn','in'],om:['sa','ae','ye'],pk:['af','cn','in','ir'],pa:['co','cr'],pe:['bo','br','cl','co','ec'],pg:['id'],pl:['by','cz','de','lt','ru','sk','ua'],kp:['cn','kr','ru'],pt:['es'],py:['ar','bo','br'],ps:['il','eg','jo'],qa:['sa'],ro:['bg','hu','md','rs','ua'],ru:['az','by','cn','ee','fi','ge','kz','kp','lv','lt','mn','no','pl','ua'],rw:['bi','cd','tz','ug'],sa:['iq','jo','kw','om','qa','ae','ye'],sd:['cf','td','eg','er','et','ly','ss'],sn:['gm','gn','gw','ml','mr'],sl:['gn','lr'],sv:['gt','hn'],sm:['it'],so:['dj','et','ke'],rs:['ba','bg','hr','hu','xk','mk','me','ro'],ss:['cf','cd','et','ke','sd','ug'],sr:['br','gy'],sk:['at','cz','hu','pl','ua'],si:['at','hr','it','hu'],se:['fi','no'],sz:['mz','za'],sy:['iq','il','jo','lb','tr'],td:['cm','cf','ly','ne','ng','sd'],tg:['bj','bf','gh'],th:['mm','kh','la','my'],tj:['af','cn','kg','uz'],tm:['af','ir','kz','uz'],tl:['id'],tn:['dz','ly'],tr:['am','az','bg','ge','gr','ir','iq','sy'],tz:['bi','cd','ke','mw','mz','rw','ug','zm'],ug:['cd','ke','rw','ss','tz'],ua:['by','hu','md','pl','ro','ru','sk'],uy:['ar','br'],us:['ca','mx'],uz:['af','kz','kg','tj','tm'],va:['it'],ve:['br','co','gy'],vn:['kh','cn','la'],ye:['om','sa'],za:['bw','ls','mz','na','sz','zw'],zm:['ao','bw','cd','mw','mz','na','tz','zw'],zw:['bw','mz','za','zm']};
+const NB = c => BORDERS[c] || [];
 
 // ---------- puzzles ----------
 const PUZ = {
@@ -443,10 +475,14 @@ const PUZ = {
   country: { max: 8, seed: 20261118, name: 'Country', icon: '🔤', noun: 'country', nouns: 'countries',
     tag: 'Guess the mystery country in 8 tries. Each guess flips clue tiles: region, people, size, language, coast and distance.' },
   shape: { max: 6, seed: 20261119, name: 'Shape', icon: '🗾', noun: 'shape', nouns: 'shapes',
-    tag: 'Name the country from its outline in 6 tries. Each miss shows how far off you are and which way to go.' }
+    tag: 'Name the country from its outline in 6 tries. Each miss shows how far off you are and which way to go.' },
+  // hop: max = stat buckets (perfect, +1 … +4). Guess limit is per game: fewest countries + 4.
+  hop: { max: 5, seed: 20261120, name: 'Border Hop', icon: '🔗', noun: 'hop', nouns: 'hops', extra: 4,
+    tag: 'Get from one country to another over land. Name the countries in between, using as few guesses as you can.' }
 };
 // Puzzles scored by distance + arrow (Flag, Shape) vs clue tiles (Country)
-const distMode = () => P !== 'country';
+const distMode = () => P === 'flag' || P === 'shape';
+const limit = () => (game && game.max) || cfg().max;
 // Shape answers skip tiny countries (under 1,000 km²): their outlines are just dots.
 const answerPool = () => COUNTRIES.filter(c => P !== 'shape' || c.area >= 1000).map(c => c.code);
 let P = 'flag';
@@ -530,17 +566,133 @@ const EMO = { g: '🟩', y: '🟨', x: '⬛' };
 // ---------- game ----------
 let game = null, endDismissed = false;
 function dailyAnswer(key) { const pool = shuffle(answerPool().sort(), cfg().seed); return pool[dayNum(key) % pool.length]; }
-function newGame(key, mode, answer) {
+function newGame(key, mode, answer, extra) {
   // flag only: which tile opens at each step. Same order for everyone on a daily, random on unlimited.
   const seed = mode === 'daily' ? dayNum(key) * 7 + 3 : Math.floor(Math.random() * 1e9);
-  return { p: P, key, mode, answer, order: shuffle([0, 1, 2, 3, 4, 5], seed), guesses: [], done: false, won: false };
+  return Object.assign({ p: P, key, mode, answer, order: shuffle([0, 1, 2, 3, 4, 5], seed), guesses: [], done: false, won: false }, extra);
+}
+
+// ---------- Border Hop ----------
+// Steps over land from one country to every other (Infinity if no land route).
+function hopsFrom(start) {
+  const d = { [start]: 0 }, q = [start];
+  for (let i = 0; i < q.length; i++) for (const n of NB(q[i])) if (!(n in d)) { d[n] = d[q[i]] + 1; q.push(n); }
+  return c => (c in d ? d[c] : Infinity);
+}
+// Pick a start and end with 3 to 5 countries in between.
+function hopPair(rnd) {
+  const starts = COUNTRIES.map(c => c.code).filter(c => NB(c).length).sort();
+  for (;;) {
+    const s = starts[Math.floor(rnd() * starts.length)], d = hopsFrom(s);
+    const ends = starts.filter(c => d(c) >= 4 && d(c) <= 6);
+    if (!ends.length) continue;
+    const e = ends[Math.floor(rnd() * ends.length)], min = d(e) - 1;
+    return { start: s, answer: e, min, max: min + cfg().extra };
+  }
+}
+// Shortest land route between two countries, as the list of countries in between.
+// With `allowed`, only those countries may be used as stops.
+function routeVia(a, b, allowed) {
+  const prev = { [a]: null }, q = [a];
+  for (let i = 0; i < q.length; i++) {
+    const x = q[i]; if (x === b) break;
+    for (const n of NB(x)) if (!(n in prev) && (!allowed || n === b || allowed.has(n))) { prev[n] = x; q.push(n); }
+  }
+  if (!(b in prev)) return null;
+  const path = []; for (let x = prev[b]; x !== a; x = prev[x]) path.unshift(x);
+  return path;
+}
+const hopRoute = () => routeVia(game.start, game.answer, new Set(game.guesses));
+// g = on a shortest route, y = one step off it, x = no help
+function hopColor(code) {
+  const da = hopsFrom(game.start), db = hopsFrom(game.answer), best = game.min + 1, v = da(code) + db(code);
+  return v === best ? 'g' : v === best + 1 ? 'y' : 'x';
+}
+const HOPEMO = { g: '🟩', y: '🟧', x: '🟥' };
+function hopCard(code) { const c = BY[code]; return `<div class="hstop"><img src="${flagUrl(code, 80)}" alt=""><span>${esc(c.name)}</span></div>`; }
+function routeHtml(path) { return `<div class="route">${[game.start, ...(path || []), game.answer].map((c, i, a) => `<span class="rstop${i && i < a.length - 1 ? '' : ' end'}"><img src="${flagUrl(c, 40)}" alt="">${esc(BY[c].name)}</span>`).join('<span class="rarr">→</span>')}</div>`; }
+function renderHopTop() {
+  const box = $('#hopbox');
+  if (P !== 'hop') { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="hends">${hopCard(game.start)}<div class="hmid">🔗<small>${game.min} in between</small></div>${hopCard(game.answer)}</div>
+    <div class="seg small hmapbar" id="mapSeg">${HOP_VIEWS.map(([v, t]) => `<button data-v="${v}" class="${v === hopView ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  document.querySelectorAll('#mapSeg button').forEach(b => b.onclick = () => { setHopView(b.dataset.v); renderHopTop(); drawHopMap(); });
+}
+
+// ---------- Border Hop map mode (easy) ----------
+// World map lives in data/world.js (~190 KB), loaded only when the map is turned on.
+// hopView: 'classic' = no map, 'blank' = map without country borders (harder), 'map' = map with borders (easy)
+const HOP_VIEWS = [['classic', '🔗 No map'], ['blank', '🌍 No borders'], ['map', '🗺️ Borders · easy']];
+let hopView = LS.get('wc:hop:view', LS.get('wc:hop:map', false) ? 'map' : 'classic'), worldLoading = null;
+function setHopView(v) { hopView = v; LS.set('wc:hop:view', v); }
+function loadWorld() {
+  if (window.WORLD) return Promise.resolve();
+  return worldLoading || (worldLoading = new Promise((ok, fail) => {
+    const s = document.createElement('script'); s.src = 'data/world.js';
+    s.onload = ok; s.onerror = () => { worldLoading = null; fail(); };
+    document.head.appendChild(s);
+  }));
+}
+const MS = 20; // map units per degree (matches data/world.js)
+function drawHopMap() {
+  const box = $('#hopmap');
+  if (P !== 'hop' || hopView === 'classic' || !game) { box.hidden = true; return; }
+  box.hidden = false;
+  // remember the easiest map used this game: once borders were shown, it counts as 'map'
+  if (!game.done && game.usedMap !== 'map' && game.usedMap !== true) game.usedMap = hopView, save();
+  // no-borders view hides the lines between countries until the game ends
+  box.classList.toggle('nob', hopView === 'blank' && !game.done);
+  if (!window.WORLD) {
+    box.innerHTML = '<div class="err">Loading map…</div>';
+    const want = game;
+    loadWorld().then(() => { if (game === want) drawHopMap(); })
+      .catch(() => { box.innerHTML = '<div class="err">The map would not load. Check your internet and reload.</div>'; });
+    return;
+  }
+  const W = window.WORLD, col = {};
+  game.guesses.forEach(c => { col[c] = hopColor(c); });
+  // Frame the start, the end and any helpful guesses. Red guesses don't move the view.
+  const focus = [game.start, game.answer, ...game.guesses.filter(c => col[c] !== 'x')];
+  if (game.done) (routeVia(game.start, game.answer) || []).forEach(c => focus.push(c));
+  let [x0, y0, x1, y1] = [1e9, 1e9, -1e9, -1e9];
+  focus.forEach(c => { const b = W[c] && W[c].b; if (b) { x0 = Math.min(x0, b[0]); y0 = Math.min(y0, b[1]); x1 = Math.max(x1, b[2]); y1 = Math.max(y1, b[3]); } });
+  const pad = Math.max(40, 0.12 * Math.max(x1 - x0, y1 - y0));
+  x0 -= pad; x1 += pad; y0 -= pad; y1 += pad;
+  // squash east-west by cos(latitude) so far-north places don't look stretched
+  const k = Math.max(0.3, Math.cos(((90 - (y0 + y1) / 2 / MS) * Math.PI) / 180));
+  let w = (x1 - x0) * k, h = y1 - y0;
+  if (w / h < 1.5) { const add = (1.5 * h - w) / k / 2; x0 -= add; x1 += add; w = 1.5 * h; } else { const add = (w / 1.5 - h) / 2; y0 -= add; y1 += add; h = w / 1.5; }
+  const cls = c => c === game.start || c === game.answer ? 'se' : col[c] ? 'm' + col[c] : '';
+  const lit = Object.keys(W).filter(c => c !== '_bg' && cls(c));
+  const paths = Object.keys(W).filter(c => c !== '_bg' && !cls(c)).map(c => `<path d="${W[c].d}"/>`).join('');
+  const hi = lit.map(c => `<path class="${cls(c)}" d="${W[c].d}"/>`).join('');
+  const fs = h * 0.036;
+  const labels = lit.map(c => {
+    const C = BY[c], x = (C.lng + 180) * MS * k, y = (90 - C.lat) * MS;
+    return `<circle class="dot ${cls(c)}" cx="${x}" cy="${y}" r="${fs * 0.28}"/><text x="${x}" y="${y - fs * 0.55}" font-size="${fs}">${esc(C.name)}</text>`;
+  }).join('');
+  box.innerHTML = `<svg viewBox="${x0 * k} ${y0} ${w} ${h}" role="img" aria-label="Map of your guesses"><rect x="${x0 * k}" y="${y0}" width="${w}" height="${h}" class="sea"/>
+    <g transform="scale(${k},1)"><path class="bg" d="${W._bg}"/>${paths}${hi}</g>${labels}</svg>`;
+}
+function hopRow(code, animate) {
+  const cls = hopColor(code), word = { g: 'On a best route', y: 'Close', x: 'Off track' }[cls];
+  return `<div class="hrow ${cls}${animate ? '' : ' noanim'}"><img src="${flagUrl(code, 40)}" alt=""><span>${esc(BY[code].name)}</span><small>${word}</small></div>`;
+}
+function makeGame(key, mode) {
+  if (P === 'hop') {
+    const rnd = mode === 'daily' ? mulberry32(cfg().seed + dayNum(key) * 9973) : Math.random;
+    return newGame(key, mode, null, hopPair(rnd));
+  }
+  if (mode === 'daily') return newGame(key, mode, dailyAnswer(key));
+  const pool = answerPool(); return newGame(key, mode, pool[Math.floor(Math.random() * pool.length)]);
 }
 function save() { LS.set(game.mode === 'unlimited' ? K('unl') : K('g:' + game.key), game); }
 
 function startDaily(key) {
   hideHome();
-  const answer = dailyAnswer(key), saved = LS.get(K('g:' + key), null);
-  game = saved && saved.answer === answer ? saved : newGame(key, 'daily', answer);
+  const fresh = makeGame(key, 'daily'), saved = LS.get(K('g:' + key), null);
+  game = saved && saved.answer === fresh.answer && saved.start === fresh.start ? saved : fresh;
   loadGame();
 }
 function startUnlimited(fresh) {
@@ -548,10 +700,9 @@ function startUnlimited(fresh) {
   let saved = LS.get(K('unl'), null);
   if (!saved || fresh) {
     const last = saved && saved.answer;
-    const pool = answerPool();
-    let pick;
-    do pick = pool[Math.floor(Math.random() * pool.length)]; while (pick === last);
-    saved = newGame('unl', 'unlimited', pick);
+    let g;
+    do g = makeGame('unl', 'unlimited'); while (g.answer === last);
+    saved = g;
   }
   game = saved; save();
   loadGame();
@@ -567,6 +718,8 @@ function loadGame() {
   } else { $('#flagbox').hidden = true; $('#flagbox').innerHTML = ''; }
   $('#shapebox').hidden = P !== 'shape';
   if (P === 'shape') drawShape();
+  renderHopTop();
+  drawHopMap();
   renderRows(false);
   renderMeta();
   if (!game.done) setTimeout(() => $('#q').focus(), 50);
@@ -620,8 +773,12 @@ function countryRow(code, animate) {
   return `<div class="crow"><div class="rowhead"><img src="${flagUrl(code, 40)}" alt="">${esc(c.name)}</div><div class="tiles">${tiles}</div></div>`;
 }
 function renderRows(animateLast) {
-  const g = game.guesses, max = cfg().max;
-  if (distMode()) {
+  const g = game.guesses, max = limit();
+  if (P === 'hop') {
+    let html = g.map((code, i) => hopRow(code, animateLast && i === g.length - 1)).join('');
+    if (game.done) html = `<div class="help" style="margin:4px 0 6px">${game.won ? 'Your route' : 'A shortest route'}</div>` + routeHtml(game.won ? hopRoute() : routeVia(game.start, game.answer)) + html;
+    $('#rows').innerHTML = html;
+  } else if (distMode()) {
     let html = g.map((code, i) => flagRow(code, animateLast && i === g.length - 1)).join('');
     if (!game.done) for (let i = g.length; i < max; i++) html += '<div class="grow empty noanim"><div>&nbsp;</div><div></div><div></div><div></div></div>';
     $('#rows').innerHTML = html;
@@ -634,9 +791,10 @@ function renderRows(animateLast) {
 function guess(code) {
   if (!game || game.done || !BY[code]) return;
   if (game.guesses.includes(code)) { toast('Already guessed that one'); return; }
+  if (P === 'hop' && (code === game.start || code === game.answer)) { toast('That one is the start or end'); return; }
   game.guesses.push(code);
-  if (isWin(code, game.answer)) { game.done = true; game.won = true; }
-  else if (game.guesses.length >= cfg().max) game.done = true;
+  if (P === 'hop' ? !!hopRoute() : isWin(code, game.answer)) { game.done = true; game.won = true; }
+  else if (game.guesses.length >= limit()) game.done = true;
   save();
   if (game.done) recordStat();
   renderRows(true);
@@ -647,20 +805,23 @@ function renderMeta() {
   const today = dateKey(new Date()), c = cfg();
   $('#modeLbl').innerHTML = game.mode === 'unlimited' ? `<b>Unlimited</b> · ${c.name}` : `<b>${game.key === today ? 'Daily' : 'Past'} ${c.noun}</b> · ${niceDate(game.key)}`;
   $('#count').textContent = game.guesses.length;
-  $('#maxG').textContent = c.max;
+  $('#maxG').textContent = limit();
   $('#q').disabled = game.done;
   $('#q').placeholder = game.done ? 'Game over' : 'Type a country…';
   openTiles();
   renderShapeHint();
+  if (P === 'hop' && hopView !== 'classic') drawHopMap();
   renderEnd();
 }
 
 function emojiRows() {
+  if (P === 'hop') return [game.guesses.map(c => HOPEMO[hopColor(c)]).join('')];
   if (distMode()) return game.guesses.map(code => { const r = compare(code); return r.win ? '🟩🟩🟩🟩🟩 🎉' : squares(r.pct) + ' ' + r.arrow; });
   return game.guesses.map(code => countryTiles(code).map(t => EMO[t.cls]).join(''));
 }
 function shareText() {
   const c = cfg(), label = game.mode === 'unlimited' ? 'Unlimited' : game.key;
+  if (P === 'hop') return `World Clue ${c.icon} ${c.name} ${label}${game.usedMap === 'blank' ? ' 🌍 map, no borders' : game.usedMap ? ' 🗺️ map' : ''}\n${BY[game.start].name} → ${BY[game.answer].name}: ${game.won ? game.guesses.length : 'X'}/${game.max} (best ${game.min})\n` + emojiRows().join('\n');
   return `World Clue ${c.icon} ${c.name} ${label} ${game.won ? game.guesses.length : 'X'}/${c.max}\n` + emojiRows().join('\n');
 }
 async function copy(t) {
@@ -674,8 +835,9 @@ function renderEnd() {
   if (!game.done) { box.hidden = true; $('#endS').classList.remove('on'); return; }
   const a = BY[game.answer], c = cfg();
   box.hidden = false;
+  const title = P === 'hop' ? `${esc(BY[game.start].name)} → ${esc(a.name)}` : esc(a.name);
   box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}"><img src="${flagUrl(a.code, 160)}" alt="">
-    <div><h3>${esc(a.name)}</h3><div class="btns"><button class="primary" id="sumBtn">Show summary</button>${game.mode === 'unlimited' ? `<button id="nextBtn2">Next ${c.noun} →</button>` : ''}<button id="homeBtn2">⌂ Home</button></div></div></div>`;
+    <div><h3>${title}</h3><div class="btns"><button class="primary" id="sumBtn">Show summary</button>${game.mode === 'unlimited' ? `<button id="nextBtn2">Next ${c.noun} →</button>` : ''}<button id="homeBtn2">⌂ Home</button></div></div></div>`;
   $('#sumBtn').onclick = openEnd;
   $('#homeBtn2').onclick = showHome;
   if ($('#nextBtn2')) $('#nextBtn2').onclick = () => startUnlimited(true);
@@ -683,14 +845,20 @@ function renderEnd() {
 }
 function openEnd() {
   if (!game || !game.done) return;
-  const a = BY[game.answer], n = game.guesses.length, daily = game.mode !== 'unlimited', c = cfg();
+  const a = BY[game.answer], n = game.guesses.length, daily = game.mode !== 'unlimited', c = cfg(), hop = P === 'hop';
+  const hopTitle = !game.won ? 'Out of guesses' : n === game.min ? 'Perfect route! 🎉' : `Made it in ${n}! 🎉`;
+  const middle = hop
+    ? `<h2 style="margin:6px 0 4px">${esc(BY[game.start].name)} → ${esc(a.name)}</h2>
+       <p class="tag" style="font-size:14px;margin-bottom:6px">Fewest possible: ${game.min} · you used ${n}</p>
+       <div class="help" style="margin-bottom:4px">${game.won ? 'Your route' : 'A shortest route'}</div>${routeHtml(game.won ? hopRoute() : routeVia(game.start, game.answer))}`
+    : `<img class="endart" src="${flagUrl(a.code, 640)}" alt="">
+    <h2 style="margin:0 0 6px">${esc(a.name)}</h2>
+    <p class="tag" style="font-size:14px;margin-bottom:6px">Capital ${esc(a.capital || '—')} · ${big(a.pop)} people · ${big(a.area)} km² · ${esc(a.sub)}</p>`;
   $('#endBody').innerHTML = `
     <div class="hlogo small">World<span>Clue</span></div>
-    <p class="endtitle">${game.won ? `Got it in ${n}! 🎉` : 'Out of guesses'}</p>
+    <p class="endtitle">${hop ? hopTitle : game.won ? `Got it in ${n}! 🎉` : 'Out of guesses'}</p>
     <p class="tag" style="margin-bottom:8px">${daily ? `Daily ${c.noun} · ` + niceDate(game.key) : `Unlimited ${c.noun}`}</p>
-    <img class="endart" src="${flagUrl(a.code, 640)}" alt="">
-    <h2 style="margin:0 0 6px">${esc(a.name)}</h2>
-    <p class="tag" style="font-size:14px;margin-bottom:6px">Capital ${esc(a.capital || '—')} · ${big(a.pop)} people · ${big(a.area)} km² · ${esc(a.sub)}</p>
+    ${middle}
     <div class="egrid">${emojiRows().join('\n')}</div>
     ${daily ? statsRow() : uStatsRow()}
     <div class="hbtns">
@@ -712,13 +880,15 @@ function recordStat() {
   if (game.mode === 'unlimited') {
     const u = uStats();
     u.played++;
-    if (game.won) { u.wins++; u.streak++; u.best = Math.max(u.best, u.streak); u.dist[game.guesses.length - 1]++; } else u.streak = 0;
+    if (game.won) { u.wins++; u.streak++; u.best = Math.max(u.best, u.streak); u.dist[statVal() - 1]++; } else u.streak = 0;
     LS.set(K('ustats'), u);
   } else {
     const s = LS.get(K('stats'), {});
-    if (!(game.key in s)) { s[game.key] = game.won ? game.guesses.length : 0; LS.set(K('stats'), s); }
+    if (!(game.key in s)) { s[game.key] = game.won ? statVal() : 0; LS.set(K('stats'), s); }
   }
 }
+// Score kept in stats: guesses used, or for Border Hop 1 = perfect, 2 = one extra guess, …
+function statVal() { return P === 'hop' ? game.guesses.length - game.min + 1 : game.guesses.length; }
 function streakOf(s) { let n = 0; const d = new Date(); if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1); while (s[dateKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); } return n; }
 function row3(a, b, c) { return `<div class="hstats"><div><b>${a[0]}</b>${a[1]}</div><div><b>${b[0]}</b>${b[1]}</div><div><b>${c[0]}</b>${c[1]}</div></div>`; }
 const pctOf = (w, p) => (p ? Math.round(w / p * 100) : 0) + '%';
@@ -729,7 +899,7 @@ function statsRow() {
 function uStatsRow() { const u = uStats(); return row3([u.played, 'Played'], [pctOf(u.wins, u.played), 'Win rate'], [u.streak + ' / ' + u.best, 'Streak / best']); }
 function distHtml(dist) {
   const mx = Math.max(1, ...dist);
-  return dist.map((c, i) => `<div class="dist"><span style="width:16px">${i + 1}</span><span class="b" style="width:${Math.max(6, c / mx * 100)}%">${c}</span></div>`).join('');
+  return dist.map((c, i) => `<div class="dist"><span style="width:${P === 'hop' ? 52 : 16}px">${P === 'hop' ? (i ? '+' + i : 'Perfect') : i + 1}</span><span class="b" style="width:${Math.max(6, c / mx * 100)}%">${c}</span></div>`).join('');
 }
 function openStats() {
   const s = LS.get(K('stats'), {}), dist = Array(cfg().max).fill(0);
@@ -748,6 +918,12 @@ function openHelp() {
   <li><b>Arrow</b> pointing the way to the answer.</li>
   <li><b>Closeness</b> from 0% on the other side of the world to 100% right on it.</li></ul>
   <p>Distances run between the middle of each country, so neighbors can still look far apart.</p>${daily}</div>`);
+  else if (P === 'hop') openModal(`<h2>How to play · Border Hop</h2><div class="help">
+  <p>You get a <b>start</b> and an <b>end</b> country. Name the countries in between so you can walk from one to the other over land borders.</p>
+  <p>Guess in any order. You win when your guesses link the two up. You get the fewest needed <b>plus 4</b> guesses.</p>
+  <div class="legend"><span style="background:var(--green)">Green = on a best route</span><span style="background:#d9822b;color:#1a1300">Orange = one step off</span><span style="background:#a33">Red = no help</span></div>
+  <p>Only land borders count, so islands like the UK, Japan or Australia never help.</p>
+  <p><b>Map modes</b> show the start, the end and your guesses in their colors on a world map. <b>Borders</b> is the easy one: you can see every country. <b>No borders</b> is harder: the land is one blank shape, so you have to know what lies between. Classic has no map at all. Pick one at home or above the map during a game. Shared results say which map was used.</p>${daily}</div>`);
   else if (P === 'shape') openModal(`<h2>How to play · Shape</h2><div class="help">
   <p>You see the outline of a mystery country. Guess it in <b>6 tries</b>.</p>
   <p>Each wrong guess shows the <b>distance</b>, an <b>arrow</b> pointing the way, and <b>closeness</b> from 0% to 100%.</p>
@@ -778,16 +954,19 @@ function renderHome() {
   const c = cfg(), today = dateKey(new Date()), g = LS.get(K('g:' + today), null);
   document.querySelectorAll('#hPuzzles button[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === P));
   $('#hTag').textContent = c.tag;
+  $('#hHopMode').hidden = P !== 'hop';
+  $('#hHopMode').innerHTML = HOP_VIEWS.map(([v, t]) => `<button data-v="${v}" class="${v === hopView ? 'on' : ''}">${v === 'classic' ? '🔗 Classic' : t}</button>`).join('');
+  document.querySelectorAll('#hHopMode button').forEach(b => b.onclick = () => { setHopView(b.dataset.v); renderHome(); });
   let status, icon = c.icon, label;
   if (!g || !g.guesses.length) { status = `<b>Today's ${c.noun} is waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = `Play today's ${c.noun}`; }
-  else if (!g.done) { status = `<b>In progress · ${g.guesses.length}/${c.max} guesses</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else if (!g.done) { status = `<b>In progress · ${g.guesses.length}/${g.max || c.max} guesses</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
   else { status = `<b>${g.won ? `Solved in ${g.guesses.length}` : 'Missed today'}</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = g.won ? '✅' : '❌'; label = "See today's result"; }
   $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
   $('#hDaily').textContent = label;
   $('#hStatsRow').innerHTML = statsRow();
   $('#hUStatsRow').innerHTML = uStatsRow();
   const u = LS.get(K('unl'), null);
-  $('#hUnl').textContent = u && !u.done && u.guesses.length ? `Continue unlimited · ${u.guesses.length}/${c.max}` : `Unlimited · random ${c.nouns}`;
+  $('#hUnl').textContent = u && !u.done && u.guesses.length ? `Continue unlimited · ${u.guesses.length}/${u.max || c.max}` : `Unlimited · random ${c.nouns}`;
 }
 document.querySelectorAll('#hPuzzles button[data-p]').forEach(b => b.onclick = () => { P = b.dataset.p; LS.set('wc:puz', P); renderHome(); });
 $('#hDaily').onclick = () => startDaily(dateKey(new Date()));
