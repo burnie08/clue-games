@@ -15,6 +15,8 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 | `reel-clue.html` | **Reel Clue**: Spotle-style movie guessing (10 guesses, 8 clue tiles). Data: TMDB API |
 | `tune-clue.html` | **Tune Clue**: Heardle-style song guessing (6 tries, growing clips). Data: iTunes Search API (30s previews) |
 | `geo-clue.html` | **Geo Clue**: GeoGuessr-style Street View guessing, with challenge links + live rooms. Data: Google Maps JS API |
+| `name-that-team.html` | **Name That Team**: Street View in an NHL city, pick which of the 32 teams plays there. Normal + hard mode. Daily / Unlimited / Challenge / Live. Same Google key + cap as Geo Clue |
+| `hometown-heroes.html` | **Hometown Heroes**: pin where an NHL player grew up (Kraken players badged). Same modes. Player list for review: `docs/hometown-heroes-players.md` |
 | `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so Geo Clue works on every device |
 | `api/room.js` | Vercel function: Geo Clue live rooms, stored in Upstash Redis |
 | `api/usage.js` | Vercel function: shared monthly Street View counter for all players (Redis key `gc:usage:YYYY-MM`, UTC month) |
@@ -26,7 +28,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
   - `#home` screen (today's status, play buttons, stats) → game → `#endS` end-of-game summary → back to home.
   - Top bar during play: ⌂ Home · Stats · ? · ⚙.
 - Daily puzzles are picked with a **seeded shuffle** (`mulberry32`) keyed by the local date, so everyone gets the same answer each day. Changing a song list, film pool, or seed changes which answer each day gets.
-- Saved data lives in the browser's `localStorage` (per device). Key prefixes: `rc:` Reel, `tc:` Tune, `gc:` Geo.
+- Saved data lives in the browser's `localStorage` (per device). Key prefixes: `rc:` Reel, `tc:` Tune, `gc:` Geo, `nt:` Name That Team, `hh:` Hometown Heroes (both read the Google key and cap from `gc:settings`).
 
 ## Keys & environment variables (Vercel → clue-games → Settings → Environment Variables)
 | Variable | Used by | Notes |
@@ -48,6 +50,11 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 - **Live rooms**: `geo-clue.html?room=CODE`. `/api/room` actions: `create`, `join`, `get`, `start`, `guess`, `next`, `endround`, `settings`. Host-only: start/next/endround/settings. Rooms expire after 6h, max 10 players. Each browser *tab* is one player (`sessionStorage` id).
 - Redis keys: `gc:room:CODE` (room JSON), `gc:room:CODE:p` (players hash), `gc:room:CODE:g` (guesses hash, field `round:playerId`).
 
+## Name That Team / Hometown Heroes multiplayer
+- Same live-room API as Geo Clue. New room fields: `settings.game` (`'geo'|'ntt'|'hh'`), `settings.hard`, `rounds[i].ans` (the right answer), and guess `pick` (the chosen team). A page redirects a room or challenge that belongs to another game.
+- Challenge link, Name That Team: `{v:1, g:'ntt', h:0|1, m, t, r:[[pano, heading, ans(team code)]×5], s:[[name,[pts×5]],…]}`
+- Challenge link, Hometown Heroes: `{v:1, g:'hh', m, t, r:[[pano, heading, ans(player id)]×5], s}`
+
 ## Testing
 ```
 cd tests
@@ -55,6 +62,10 @@ npm install           # first time only (installs jsdom)
 node smoke-single.js        # home → play → end → home for all three games
 node smoke-multiplayer.js   # 2-player live room + challenge link round trip
 node smoke-live-timer.js    # live room timer settings + timeouts
+node smoke-room-games.js    # room API with game/hard/ans/pick
+node smoke-ntt.js           # Name That Team solo
+node smoke-ntt-multi.js     # Name That Team challenge + live room
+node smoke-hh.js            # Hometown Heroes
 ```
 These print what happened at each step. Read the output and check it makes sense. They fake TMDB/iTunes/Google/Redis, so they test the game logic, not the real services. After changing a game, also run a quick syntax check of its script.
 
