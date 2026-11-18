@@ -244,7 +244,8 @@ const PLAYERS = [
 ];
 const BY_ID = Object.fromEntries(PLAYERS.map(p => [p.id, p]));
 // lookups by a key that came from a link or a room: Object.hasOwn so names like "constructor" don't count
-const has = (o, k) => Object.hasOwn(o, k);
+// (strings only: Object.hasOwn turns ['ntt'] into 'ntt', so an array key would pass)
+const has = (o, k) => typeof k === 'string' && Object.hasOwn(o, k);
 const UNKNOWN = { id: '', name: 'Unknown player', team: '', town: 'unknown town', kraken: false };
 const playerOf = id => has(BY_ID, id) ? BY_ID[id] : UNKNOWN;
 const MOVES = { move: 'Moving', nomove: 'No move', nmpz: 'NMPZ' };
@@ -767,7 +768,8 @@ function readUrl() {
     if (c) {
       const ch = b64d(c);
       if (!ch || !Array.isArray(ch.r) || ch.r.length !== ROUNDS) throw 0;
-      const g = ch.g || 'geo';   // links without a game are Geo Clue links
+      const g = ch.g == null ? 'geo' : ch.g;   // links without a game are Geo Clue links
+      if (typeof g !== 'string') throw 0;
       if (g !== 'hh') { if (!has(GAME_PAGES, g)) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
       if (!ch.r.every(x => Array.isArray(x) && typeof x[0] === 'string' && has(BY_ID, x[2]))) throw 0;   // unknown player = broken link
       ch.m = has(MOVES, ch.m) ? ch.m : 'move';

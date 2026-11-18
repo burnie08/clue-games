@@ -181,6 +181,12 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
    check(`ntt link with team "${id}" is broken`,Y.w.__t.pc()===null&&txt(Y.d.querySelector('#chalBanner'))==='');}
   const Z=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'constructor',r:R5,s:[]})});await sleep(30);
   check('ntt page: link with g "constructor" is broken, not redirected',Z.w.__went===undefined&&Z.w.__t.pc()===null);
+  const Z2=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:['ntt'],h:0,m:'move',t:0,r:R5,s:[]})});await sleep(30);
+  check('ntt page: g ["ntt"] is a broken link, no redirect, home renders',Z2.w.__went===undefined&&Z2.w.__t.pc()===null&&on(Z2.d,'#home')&&txt(Z2.d.querySelector('#chalBanner'))==='');
+  const Z3=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:[...R5.slice(0,4),['P5',0,['SEA']]],s:[]})});await sleep(30);
+  check('ntt page: array team id ["SEA"] is a broken link',Z3.w.__went===undefined&&Z3.w.__t.pc()===null);
+  const Z4=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:['nmpz'],t:0,r:R5,s:[]})});await sleep(30);
+  check('ntt page: array move falls back to Moving',!!Z4.w.__t.pc()&&Z4.w.__t.pc().m==='move');
   check('malformed scores (5, [null], bad entries, string): home still renders, banner shown'+(badS.length?' — broke on '+badS.join(' '):''),!badS.length);}
 
  console.log(bad?`${bad} FAILED`:'ALL PASS');

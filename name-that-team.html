@@ -735,7 +735,8 @@ const COLORS = ['#e4b343', '#4fa3ff', '#ff6b9a', '#7ddc6f', '#c38bff', '#ff8f4f'
 // rooms and links are shared between the games: one made for another game is handed to that game's page
 const GAME_PAGES = { geo: 'geo-clue.html', ntt: 'name-that-team.html', hh: 'hometown-heroes.html' };
 // lookups by a key that came from a link or a room: Object.hasOwn so names like "constructor" don't count
-const has = (o, k) => Object.hasOwn(o, k);
+// (strings only: Object.hasOwn turns ['ntt'] into 'ntt', so an array key would pass)
+const has = (o, k) => typeof k === 'string' && Object.hasOwn(o, k);
 function goPage(url) { location.replace(url); }
 function askName(cb) {
   if (settings.name) return cb(settings.name);
@@ -758,7 +759,8 @@ function readUrl() {
     if (c) {
       const ch = b64d(c);
       if (!ch || !Array.isArray(ch.r) || ch.r.length !== ROUNDS) throw 0;
-      const g = ch.g || 'geo';   // links without a game are Geo Clue links
+      const g = ch.g == null ? 'geo' : ch.g;   // links without a game are Geo Clue links
+      if (typeof g !== 'string') throw 0;
       if (g !== 'ntt') { if (!has(GAME_PAGES, g)) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
       if (!ch.r.every(x => Array.isArray(x) && typeof x[0] === 'string' && has(TEAM, x[2]))) throw 0;   // unknown team = broken link
       ch.m = has(MOVES, ch.m) ? ch.m : 'move';

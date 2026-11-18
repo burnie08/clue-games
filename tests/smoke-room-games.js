@@ -97,5 +97,12 @@ const get=async code=>(await callApi({action:'get',code})).j;
  check('hh challenge link on geo page -> hometown-heroes.html',w.__went==='hometown-heroes.html?c='+hhLink);
  w=geoPage('?c='+b64({v:1,g:'constructor',r:R5,s:[]}));await sleep(60);
  check('link with g "constructor" is broken, not redirected',w.__went===undefined&&w.__pc()===null);
+ // array values: Object.hasOwn turns ['geo'] into 'geo', so these must be rejected or ignored, never redirected
+ w=geoPage('?c='+b64({v:1,g:['geo'],p:'world',m:'move',t:0,r:R5,s:[]}));await sleep(60);
+ check('geo page: g ["geo"] is a broken link, no redirect, home renders',w.__went===undefined&&w.__pc()===null&&w.document.querySelector('#home').classList.contains('on')&&txt(w.document.querySelector('#chalBanner'))==='');
+ w=geoPage('?c='+b64({v:1,g:['ntt'],r:R5,s:[]}));await sleep(60);
+ check('geo page: g ["ntt"] is a broken link, no redirect',w.__went===undefined&&w.__pc()===null);
+ w=geoPage('?c='+b64({v:1,p:['europe'],m:['nmpz'],t:0,r:R5,s:[]}));await sleep(60);
+ check('geo page: array p/m fall back to World/Moving',!!w.__pc()&&w.__pc().p==='world'&&w.__pc().m==='move'&&/World · Moving/.test(txt(w.document.querySelector('#chalBanner'))));
  console.log(bad?bad+' FAILED':'ALL PASSED');process.exit(process.exitCode||0);
 })().catch(e=>{console.error('ERR',e);process.exit(1)});

@@ -261,7 +261,14 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   const L2=browser('Sam',{url:URL0+'?c='+nttLink});await sleep(30);
   check('ntt challenge link -> name-that-team.html',L2.w.__went==='name-that-team.html?c='+nttLink);
   const L3=browser('Sam',{url:URL0+'?c='+b64({v:1,g:'constructor',r:r5,s:[]})});await sleep(30);
-  check('link with g "constructor" is broken, not redirected',L3.w.__went===undefined&&L3.w.__t.pc()===null);}
+  check('link with g "constructor" is broken, not redirected',L3.w.__went===undefined&&L3.w.__t.pc()===null);
+  const okR=[['P1',0,'mccann'],['P2',0,'beniers'],['P3',0,'crosby'],['P4',0,'mcdavid'],['P5',0,'kakko']];
+  const L4=browser('Sam',{url:URL0+'?c='+b64({v:1,g:['hh'],m:'move',t:0,r:okR,s:[]})});await sleep(30);
+  check('hh page: g ["hh"] is a broken link, no redirect, home renders',L4.w.__went===undefined&&L4.w.__t.pc()===null&&on(L4.d,'#home')&&txt(L4.d.querySelector('#chalBanner'))==='');
+  const L5=browser('Sam',{url:URL0+'?c='+b64({v:1,g:'hh',m:'move',t:0,r:[...okR.slice(0,4),['P5',0,['kakko']]],s:[]})});await sleep(30);
+  check('hh page: array player id ["kakko"] is a broken link',L5.w.__went===undefined&&L5.w.__t.pc()===null);
+  const L6=browser('Sam',{url:URL0+'?c='+b64({v:1,g:'hh',m:['nmpz'],t:0,r:okR,s:[]})});await sleep(30);
+  check('hh page: array move falls back to Moving',!!L6.w.__t.pc()&&L6.w.__t.pc().m==='move');}
 
  console.log(bad?`${bad} FAILED`:'ALL PASS');
  process.exit(process.exitCode||0);
