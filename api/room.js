@@ -1,15 +1,17 @@
-// Geo Clue live rooms. Stores rooms in Upstash Redis (connect it in Vercel → Storage → Upstash for Redis;
+// Live rooms for all three Street View games (Geo Clue, Name That Team, Hometown Heroes; settings.game says which).
+// Stores rooms in Upstash Redis (connect it in Vercel → Storage → Upstash for Redis;
 // the integration adds KV_REST_API_URL / KV_REST_API_TOKEN automatically). Rooms expire after 6 hours.
 //
 // Keys:  gc:room:CODE    → room JSON {code, hostId, settings, rounds, state, round, startedAt, forceEnd}
 //        gc:room:CODE:p  → hash  playerId → {"name": "..."}
-//        gc:room:CODE:g  → hash  "round:playerId" → {"lat","lng","km","pts"}
+//        gc:room:CODE:g  → hash  "round:playerId" → {"lat","lng","km","pts","pick"}
 
 const DB_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const DB_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const TTL = 6 * 3600;
 const MAX_PLAYERS = 10;
 const ROUNDS = 5;
+const GAMES = ['geo', 'ntt', 'hh'];
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 async function redis(commands) {
@@ -48,8 +50,9 @@ module.exports = async (req, res) => {
       if (!id || rounds.length !== ROUNDS) return fail(400, 'Bad request');
       const room = {
         hostId: id, state: 'lobby', round: 0, startedAt: 0, forceEnd: -1, createdAt: Date.now(),
-        settings: { pack: clean(s.pack, 20) || 'world', move: clean(s.move, 10) || 'move', timer: Math.max(0, Math.min(600, +s.timer || 0)) },
-        rounds: rounds.map(r => ({ pano: clean(r.pano, 200), heading: +r.heading || 0, lat: +r.lat, lng: +r.lng, desc: clean(r.desc, 200), region: clean(r.region, 60) }))
+        settings: { pack: clean(s.pack, 20) || 'world', move: clean(s.move, 10) || 'move', timer: Math.max(0, Math.min(600, +s.timer || 0)),
+          game: GAMES.includes(s.game) ? s.game : 'geo', hard: s.hard === true },
+        rounds: rounds.map(r => ({ pano: clean(r.pano, 200), heading: +r.heading || 0, lat: +r.lat, lng: +r.lng, desc: clean(r.desc, 200), region: clean(r.region, 60), ans: clean(r.ans, 40) }))
       };
       for (let tries = 0; tries < 8; tries++) {
         room.code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
@@ -72,12 +75,16 @@ module.exports = async (req, res) => {
 
     if (action === 'join') {
       if (!id) return fail(400, 'Bad request');
+      // the page says which game it is: a room for another game isn't joined here, so the page can hand
+      // over to the right one without leaving a "ghost" player behind (older pages send no game and just join)
+      const game = room.settings.game || 'geo';
+      if (body.game != null && body.game !== game) return res.status(200).json({ ok: false, game });
       if (!data.players[id]) {
         if (room.state !== 'lobby') return fail(409, 'That game has already started.');
         if (Object.keys(data.players).length >= MAX_PLAYERS) return fail(409, `Room is full (max ${MAX_PLAYERS}).`);
       }
       await redis([['HSET', K + ':p', id, JSON.stringify({ name: clean(body.name, 24) || 'Player' })], ['EXPIRE', K + ':p', TTL]]);
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, game });
     }
 
     if (action === 'guess') {
@@ -85,7 +92,8 @@ module.exports = async (req, res) => {
       if (room.state !== 'play' || room.round !== round) return fail(409, 'Round is over');
       if (!data.players[id]) return fail(403, 'Not in this room');
       const g = { pts: Math.max(0, Math.min(5000, Math.round(+body.pts || 0))), km: body.km == null ? null : +body.km,
-        lat: body.lat == null ? null : +body.lat, lng: body.lng == null ? null : +body.lng };
+        lat: body.lat == null ? null : +body.lat, lng: body.lng == null ? null : +body.lng,
+        pick: body.pick == null ? null : clean(body.pick, 40) };
       await redis([['HSETNX', K + ':g', round + ':' + id, JSON.stringify(g)], ['EXPIRE', K + ':g', TTL]]);
       return res.status(200).json({ ok: true });
     }
@@ -105,6 +113,7 @@ module.exports = async (req, res) => {
       const s = body.settings || {};
       if (s.timer != null) room.settings.timer = Math.max(0, Math.min(600, +s.timer || 0));
       if (['move', 'nomove', 'nmpz'].includes(s.move)) room.settings.move = s.move;
+      if (typeof s.hard === 'boolean') room.settings.hard = s.hard;
     } else return fail(400, 'Unknown action');
     await saveRoom(room);
     return res.status(200).json({ ok: true });

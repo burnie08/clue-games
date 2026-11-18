@@ -28,7 +28,7 @@ function browser(name,url){
  class Pano extends O{setOptions(){}getPano(){return 'x'}setPano(){}setPov(){}setZoom(){}}
  const locs={};class SVS{async getPanorama(r){if(r.pano){const l=global.__panoLocs[r.pano];return{data:{location:{pano:r.pano,latLng:new LL(l.lat,l.lng),description:'Road '+r.pano}}}}const id='PANO'+(++panoN);global.__panoLocs[id]={lat:r.location.lat,lng:r.location.lng};return{data:{location:{pano:id,latLng:new LL(r.location.lat,r.location.lng),description:'Road '+id}}}}}
  w.__LL=LL;
- w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g'}},marker:{Marker}})[k]}};
+ w.google={maps:{importLibrary:async k=>({core:{LatLngBounds:class{extend(){}},SymbolPath:{CIRCLE:0}},maps:{Map,Polyline:O},streetView:{StreetViewPanorama:Pano,StreetViewService:SVS,StreetViewSource:{GOOGLE:'g',OUTDOOR:'o'}},marker:{Marker}})[k]}};
  w.fetch=async(u,o)=>{if(String(u).includes('api/usage'))return{ok:false,status:503,json:async()=>({error:'nodb'})};if(String(u).includes('api/config'))return{ok:true,status:200,json:async()=>({googleMapsKey:''})};const {status,j}=await callApi(JSON.parse(o.body));return{ok:status<300,status,json:async()=>j}};
  w.eval(src+';window.__t={g:()=>game,map:()=>map,poll:pollRoom,live:()=>live};');
  const d=w.document;
