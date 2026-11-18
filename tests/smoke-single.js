@@ -39,9 +39,11 @@ async function tune(){
  d.querySelectorAll('#hDiff button')[1].click(); console.log('      switch to Normal -> card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '));
 }
 async function geo(){
- let panoLoads=0;
+ let panoLoads=0,shared=1234,bumps=0;
  const {w,d,src}=make('geo-clue.html',w=>{
   w.localStorage.setItem('gc:settings',JSON.stringify({key:'AIzaX'}));
+  // fake /api/usage: shared Street View counter for everyone
+  w.fetch=async(u,o)=>{if(String(u).includes('api/usage')){if(o&&o.method==='POST'){shared++;bumps++;}return{ok:true,status:200,json:async()=>({month:'2026-11',panos:shared,free:5000})};}return{ok:false,status:404,json:async()=>({})};};
   class LL{constructor(a,b){this.a=a;this.b=b}lat(){return this.a}lng(){return this.b}}
   class O{constructor(o){this.o=o||{};this.ls={}}addListener(e,f){this.ls[e]=f}setMap(m){this.m=m}getMap(){return this.m}}
   class Marker extends O{constructor(o){super(o);this.m=o.map;this.p=o.position}setPosition(p){this.p=p}getPosition(){return new LL(this.p.lat,this.p.lng)}}
@@ -57,8 +59,18 @@ async function geo(){
  console.log('      after play: home on',on(d,'#home'),'| google script loaded:',[...d.scripts].some(s=>/maps.googleapis/.test(s.src)),'| phase',w.__t.g().phase);
  for(let i=0;i<5;i++){const r=w.__t.g().rounds[i];w.__t.map().ls.click({latLng:new w.__LL(r.lat+1,r.lng+1)});d.querySelector('#guessBtn').click();d.querySelector('#nextBtn').click();}
  console.log('      final panel:',d.querySelector('#resPanel').textContent.replace(/\s+/g,' ').slice(0,90)+'…','| home btn:',!!d.querySelector('#homeBtn'));
- d.querySelector('#homeBtn').click(); console.log('      back home',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '));
+ d.querySelector('#homeBtn').click(); await sleep(50); console.log('      back home',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '));
+ console.log('      shared bumps sent:',bumps,'(expect 5) | home meter:',d.querySelector('#hUsage').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#hSet').click(); await sleep(50); console.log('      settings meter:',d.querySelector('#sMeter').textContent.replace(/\s+/g,' ').trim().slice(0,80)+'…'); d.querySelector('#mclose').click();
  d.querySelector('#hPack').value='europe';d.querySelector('#hPack').dispatchEvent(new w.Event('change'));
  d.querySelector('#hUnl').click(); await sleep(200); console.log('      unlimited from home:',d.querySelector('#hMode').textContent,'| home on',on(d,'#home'),'| pano objects',panoLoads);
 }
-(async()=>{await reel();await tune();await geo();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
+async function geoNoDb(){
+ const {w,d,src}=make('geo-clue.html',w=>{
+  w.localStorage.setItem('gc:settings',JSON.stringify({key:'AIzaX'}));
+  w.localStorage.setItem('gc:usage',JSON.stringify({month:new Date().getFullYear()+'-'+String(new Date().getMonth()+1).padStart(2,'0'),panos:4200,maps:3}));
+  w.fetch=async()=>({ok:false,status:503,json:async()=>({error:'nodb'})});});
+ w.eval(src); await sleep(50);
+ console.log('GEO   no database: home on',on(d,'#home'),'| meter:',d.querySelector('#hUsage').textContent.replace(/\s+/g,' ').trim());
+}
+(async()=>{await reel();await tune();await geo();await geoNoDb();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});

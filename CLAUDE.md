@@ -17,6 +17,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 | `geo-clue.html` | **Geo Clue**: GeoGuessr-style Street View guessing, with challenge links + live rooms. Data: Google Maps JS API |
 | `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so Geo Clue works on every device |
 | `api/room.js` | Vercel function: Geo Clue live rooms, stored in Upstash Redis |
+| `api/usage.js` | Vercel function: shared monthly Street View counter for all players (Redis key `gc:usage:YYYY-MM`, UTC month) |
 | `tests/` | Smoke tests that run the games in a fake browser with fake APIs (see Testing) |
 
 ## How it's built
@@ -38,9 +39,9 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 **Never commit API keys.** The repo is public.
 
 ## Cost guardrails (keep these)
-- Google Street View: 5,000 free loads/month. Each Geo Clue round = 1 load per player. The game counts loads per browser and stops at the ⚙ limit (default 4,000). Finding locations uses Street View *metadata* (free).
+- Google Street View: 5,000 free loads/month. Each Geo Clue round = 1 load per player. Every load bumps a shared counter (`/api/usage`), shown as a meter on the Geo Clue home screen and in ⚙. The game stops when the shared count reaches the ⚙ limit (default 4,000); if the counter is unreachable it falls back to this browser's own count. Finding locations uses Street View *metadata* (free).
 - Google Maps is only loaded when a Geo Clue game starts (not on its home screen).
-- Upstash free plan: 500K commands/month. Live rooms poll every 2s; a 4-player game uses roughly 2,500 commands.
+- Upstash free plan: 500K commands/month. The usage counter adds ~1 command per Street View load and per home/settings view. Live rooms poll every 2s; a 4-player game uses roughly 2,500 commands.
 
 ## Geo Clue multiplayer
 - **Challenge links**: `geo-clue.html?c=<base64url JSON>`. Format v1: `{v:1, p:pack, m:move, t:timer, r:[[panoId, heading, region]×5], s:[[name, [pts×5]], …]}`. Locations are re-read from Street View metadata by pano ID.
