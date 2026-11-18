@@ -106,7 +106,7 @@ const full=t=>t.city+' '+t.name;
   check('hard spot retried when pano is farther than 0.3 km, radius 150',hr.length===2&&hr.every(r=>r.radius===150&&r.preference==='nearest'&&r.sources[0]==='g')&&t.distKm(far,t.TEAM.SEA)<=0.3);}
 
  {const H=browser({shared:10,nt:{hard:true,move:'move',timer:0}});await sleep(40);
-  check('hard toggle on home screen, move/timer hidden while on',H.d.querySelector('#hHard').checked&&H.d.querySelector('#hOpts').hidden);
+  check('hard toggle on home screen, move/timer hidden while on (computed display none)',H.d.querySelector('#hHard').checked&&H.d.querySelector('#hOpts').hidden&&H.w.getComputedStyle(H.d.querySelector('#hOpts')).display==='none');
   H.d.querySelector('#hUnl').click();await H.ready();
   const g=H.w.__t.g(),po=H.w.__t.pano().o;
   check('hard locks view: game.hard, NMPZ, 25s timer, #block on, no links/clickToGo',g.hard===true&&g.move==='nmpz'&&g.timer===25&&on(H.d,'#block')&&po.linksControl===false&&po.clickToGo===false&&H.d.querySelector('#timer').textContent==='⏱ 25s');
