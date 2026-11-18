@@ -37,7 +37,7 @@ main{max-width:560px;margin:0 auto;padding:16px}
 .shapebox path{fill:var(--accent);fill-rule:evenodd}
 .shapebox .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 #hopbox{margin-bottom:12px}
-.hmapbar{display:flex;justify-content:center;margin-top:8px}.hmapbar button{font-size:13px;padding:6px 12px}
+.seg.small.hmapbar{margin:8px 0 0}
 .hopmap{position:relative;width:100%;aspect-ratio:3/2;margin-bottom:12px;border-radius:12px;overflow:hidden;border:2px solid #232733;background:#141a26}
 .hopmap svg{width:100%;height:100%;display:block}
 .hopmap .sea{fill:#141a26}
@@ -47,6 +47,7 @@ main{max-width:560px;margin:0 auto;padding:16px}
 .hopmap path.mg{fill:var(--green)}.hopmap path.my{fill:#d9822b}.hopmap path.mx{fill:#a33}
 .hopmap circle{fill:#fff;stroke:#0f1117;stroke-width:1px;vector-effect:non-scaling-stroke}
 .hopmap text{fill:#fff;text-anchor:middle;font-weight:700;paint-order:stroke;stroke:#0f1117;stroke-width:3px;stroke-linejoin:round}
+.hopmap.nob path:not(.se):not(.mg):not(.my):not(.mx){fill:#2b3140;stroke:#2b3140}
 .hopmap .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 .seg.small{margin-top:-6px}.seg.small button{padding:7px 4px;font-size:13px}
 .hends{display:flex;align-items:center;gap:10px}
@@ -187,7 +188,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
     <button data-p="shape">🗾 Shape</button>
     <button data-p="hop">🔗 Border Hop</button>
   </div>
-  <div class="seg small" id="hHopMode" hidden><button data-m="classic">🔗 Classic</button><button data-m="map">🗺️ Map · easy</button></div>
+  <div class="seg small" id="hHopMode" hidden></div>
   <div class="today" id="todayCard"></div>
   <div class="hbtns">
     <button class="primary" id="hDaily">Play today's flag</button>
@@ -615,13 +616,16 @@ function renderHopTop() {
   if (P !== 'hop') { box.hidden = true; return; }
   box.hidden = false;
   box.innerHTML = `<div class="hends">${hopCard(game.start)}<div class="hmid">🔗<small>${game.min} in between</small></div>${hopCard(game.answer)}</div>
-    <div class="hmapbar"><button id="mapBtn">${hopMap ? '🗺️ Map on · easy' : '🗺️ Show map (easy)'}</button></div>`;
-  $('#mapBtn').onclick = () => { hopMap = !hopMap; LS.set('wc:hop:map', hopMap); renderHopTop(); drawHopMap(); };
+    <div class="seg small hmapbar" id="mapSeg">${HOP_VIEWS.map(([v, t]) => `<button data-v="${v}" class="${v === hopView ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+  document.querySelectorAll('#mapSeg button').forEach(b => b.onclick = () => { setHopView(b.dataset.v); renderHopTop(); drawHopMap(); });
 }
 
 // ---------- Border Hop map mode (easy) ----------
 // World map lives in data/world.js (~190 KB), loaded only when the map is turned on.
-let hopMap = LS.get('wc:hop:map', false), worldLoading = null;
+// hopView: 'classic' = no map, 'blank' = map without country borders (harder), 'map' = map with borders (easy)
+const HOP_VIEWS = [['classic', '🔗 No map'], ['blank', '🌍 No borders'], ['map', '🗺️ Borders · easy']];
+let hopView = LS.get('wc:hop:view', LS.get('wc:hop:map', false) ? 'map' : 'classic'), worldLoading = null;
+function setHopView(v) { hopView = v; LS.set('wc:hop:view', v); }
 function loadWorld() {
   if (window.WORLD) return Promise.resolve();
   return worldLoading || (worldLoading = new Promise((ok, fail) => {
@@ -633,9 +637,12 @@ function loadWorld() {
 const MS = 20; // map units per degree (matches data/world.js)
 function drawHopMap() {
   const box = $('#hopmap');
-  if (P !== 'hop' || !hopMap || !game) { box.hidden = true; return; }
+  if (P !== 'hop' || hopView === 'classic' || !game) { box.hidden = true; return; }
   box.hidden = false;
-  if (!game.done) game.usedMap = true, save();
+  // remember the easiest map used this game: once borders were shown, it counts as 'map'
+  if (!game.done && game.usedMap !== 'map' && game.usedMap !== true) game.usedMap = hopView, save();
+  // no-borders view hides the lines between countries until the game ends
+  box.classList.toggle('nob', hopView === 'blank' && !game.done);
   if (!window.WORLD) {
     box.innerHTML = '<div class="err">Loading map…</div>';
     const want = game;
@@ -803,7 +810,7 @@ function renderMeta() {
   $('#q').placeholder = game.done ? 'Game over' : 'Type a country…';
   openTiles();
   renderShapeHint();
-  if (P === 'hop' && hopMap) drawHopMap();
+  if (P === 'hop' && hopView !== 'classic') drawHopMap();
   renderEnd();
 }
 
@@ -814,7 +821,7 @@ function emojiRows() {
 }
 function shareText() {
   const c = cfg(), label = game.mode === 'unlimited' ? 'Unlimited' : game.key;
-  if (P === 'hop') return `World Clue ${c.icon} ${c.name} ${label}${game.usedMap ? ' 🗺️ map' : ''}\n${BY[game.start].name} → ${BY[game.answer].name}: ${game.won ? game.guesses.length : 'X'}/${game.max} (best ${game.min})\n` + emojiRows().join('\n');
+  if (P === 'hop') return `World Clue ${c.icon} ${c.name} ${label}${game.usedMap === 'blank' ? ' 🌍 map, no borders' : game.usedMap ? ' 🗺️ map' : ''}\n${BY[game.start].name} → ${BY[game.answer].name}: ${game.won ? game.guesses.length : 'X'}/${game.max} (best ${game.min})\n` + emojiRows().join('\n');
   return `World Clue ${c.icon} ${c.name} ${label} ${game.won ? game.guesses.length : 'X'}/${c.max}\n` + emojiRows().join('\n');
 }
 async function copy(t) {
@@ -916,7 +923,7 @@ function openHelp() {
   <p>Guess in any order. You win when your guesses link the two up. You get the fewest needed <b>plus 4</b> guesses.</p>
   <div class="legend"><span style="background:var(--green)">Green = on a best route</span><span style="background:#d9822b;color:#1a1300">Orange = one step off</span><span style="background:#a33">Red = no help</span></div>
   <p>Only land borders count, so islands like the UK, Japan or Australia never help.</p>
-  <p><b>Map mode</b> is the easy version: a map shows the start, the end and your guesses in their colors. Turn it on at home or with the map button during a game. Shared results say when the map was used.</p>${daily}</div>`);
+  <p><b>Map modes</b> show the start, the end and your guesses in their colors on a world map. <b>Borders</b> is the easy one: you can see every country. <b>No borders</b> is harder: the land is one blank shape, so you have to know what lies between. Classic has no map at all. Pick one at home or above the map during a game. Shared results say which map was used.</p>${daily}</div>`);
   else if (P === 'shape') openModal(`<h2>How to play · Shape</h2><div class="help">
   <p>You see the outline of a mystery country. Guess it in <b>6 tries</b>.</p>
   <p>Each wrong guess shows the <b>distance</b>, an <b>arrow</b> pointing the way, and <b>closeness</b> from 0% to 100%.</p>
@@ -948,7 +955,8 @@ function renderHome() {
   document.querySelectorAll('#hPuzzles button[data-p]').forEach(b => b.classList.toggle('on', b.dataset.p === P));
   $('#hTag').textContent = c.tag;
   $('#hHopMode').hidden = P !== 'hop';
-  document.querySelectorAll('#hHopMode button').forEach(b => b.classList.toggle('on', (b.dataset.m === 'map') === hopMap));
+  $('#hHopMode').innerHTML = HOP_VIEWS.map(([v, t]) => `<button data-v="${v}" class="${v === hopView ? 'on' : ''}">${v === 'classic' ? '🔗 Classic' : t}</button>`).join('');
+  document.querySelectorAll('#hHopMode button').forEach(b => b.onclick = () => { setHopView(b.dataset.v); renderHome(); });
   let status, icon = c.icon, label;
   if (!g || !g.guesses.length) { status = `<b>Today's ${c.noun} is waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = `Play today's ${c.noun}`; }
   else if (!g.done) { status = `<b>In progress · ${g.guesses.length}/${g.max || c.max} guesses</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
@@ -960,7 +968,6 @@ function renderHome() {
   const u = LS.get(K('unl'), null);
   $('#hUnl').textContent = u && !u.done && u.guesses.length ? `Continue unlimited · ${u.guesses.length}/${u.max || c.max}` : `Unlimited · random ${c.nouns}`;
 }
-document.querySelectorAll('#hHopMode button').forEach(b => b.onclick = () => { hopMap = b.dataset.m === 'map'; LS.set('wc:hop:map', hopMap); renderHome(); });
 document.querySelectorAll('#hPuzzles button[data-p]').forEach(b => b.onclick = () => { P = b.dataset.p; LS.set('wc:puz', P); renderHome(); });
 $('#hDaily').onclick = () => startDaily(dateKey(new Date()));
 $('#hUnl').onclick = () => startUnlimited(false);

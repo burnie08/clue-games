@@ -144,8 +144,8 @@ async function world(){
  // ---- Border Hop map mode ----
  d.querySelector('#eHome').click();
  console.log('      home mode buttons:',[...d.querySelectorAll('#hHopMode button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '),'| shown',!d.querySelector('#hHopMode').hidden);
- d.querySelectorAll('#hHopMode button')[1].click(); w.__t.unl(true); await sleep(50); h=w.__t.g();
- console.log('      map on, before file loads:',d.querySelector('#hopmap').textContent,'| script tag',[...d.querySelectorAll('script')].some(s=>/world\.js/.test(s.src)),'| map btn:',d.querySelector('#mapBtn').textContent);
+ d.querySelectorAll('#hHopMode button')[2].click(); w.__t.unl(true); await sleep(50); h=w.__t.g();
+ console.log('      map on, before file loads:',d.querySelector('#hopmap').textContent,'| script tag',[...d.querySelectorAll('script')].some(s=>/world\.js/.test(s.src)),'| map bar:',[...d.querySelectorAll('#mapSeg button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '));
  w.eval(fs.readFileSync(path.join(ROOT,'data/world.js'),'utf8')); w.__t.drawMap();
  const lit=()=>[...d.querySelectorAll('#hopmap path[class]')].map(p=>p.getAttribute('class')).filter(c=>c!=='bg');
  console.log('      map drawn:',nm(h.start),'->',nm(h.answer),'| paths',d.querySelectorAll('#hopmap path').length,'| lit',lit().join(','),'| labels',[...d.querySelectorAll('#hopmap text')].map(t=>t.textContent).join(', '));
@@ -153,7 +153,12 @@ async function world(){
  console.log('      after 1 good + 1 island guess: lit',lit().join(','),'| labels',[...d.querySelectorAll('#hopmap text')].map(t=>t.textContent).join(', '),'| viewBox',d.querySelector('#hopmap svg').getAttribute('viewBox'));
  for(const c of r2.slice(1)) w.__t.guess(c); await sleep(1500);
  d.querySelector('#eShare').click(); await sleep(10); console.log('      won',h.won,'| share:',JSON.stringify(w.__copied));
- d.querySelector('#eBoard').click(); d.querySelector('#mapBtn').click(); console.log('      map button off -> map hidden',d.querySelector('#hopmap').hidden);
+ d.querySelector('#eBoard').click(); d.querySelector('#mapSeg button[data-v=classic]').click(); console.log('      "No map" button -> map hidden',d.querySelector('#hopmap').hidden);
+ // ---- no-borders map ----
+ d.querySelector('#eHome').click(); d.querySelectorAll('#hHopMode button')[1].click(); w.__t.unl(true); await sleep(50); h=w.__t.g();
+ console.log('      no-borders: home buttons',[...d.querySelectorAll('#hHopMode button')].map(b=>b.textContent+(b.classList.contains('on')?'*':'')).join(' / '),'| map shown',!d.querySelector('#hopmap').hidden,'| borders hidden',d.querySelector('#hopmap').classList.contains('nob'),'| lit',lit().join(','));
+ const r3=w.__t.route(h.start,h.answer); for(const c of r3) w.__t.guess(c); await sleep(1500);
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      won',h.won,'| borders back after end',!d.querySelector('#hopmap').classList.contains('nob'),'| share:',JSON.stringify(w.__copied));
  // many random pairs: always 3-5 in between, and a route exists
  const r=w.__t.mb(42); let bad=0,mins={}; for(let i=0;i<300;i++){const p=w.__t.pair(r);const rt=w.__t.route(p.start,p.answer);if(!rt||rt.length!==p.min||p.min<3||p.min>5)bad++;mins[p.min]=(mins[p.min]||0)+1;}
  console.log('      300 random pairs: bad',bad,'| fewest-in-between counts',JSON.stringify(mins));
