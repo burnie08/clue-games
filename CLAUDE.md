@@ -15,6 +15,8 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 | `reel-clue.html` | **Reel Clue**: Spotle-style movie guessing (10 guesses, 8 clue tiles). Data: TMDB API |
 | `tune-clue.html` | **Tune Clue**: Heardle-style song guessing (6 tries, growing clips). Data: iTunes Search API (30s previews) |
 | `geo-clue.html` | **Geo Clue**: GeoGuessr-style Street View guessing, with challenge links + live rooms. Data: Google Maps JS API |
+| `world-clue.html` | **World Clue**: geography puzzles. Puzzles picked with tabs on its home (`P` = `flag` or `country`, settings in `PUZ`). **Flag**: hidden flag under 6 tiles, 6 guesses, distance + arrow + closeness %. **Country**: 8 guesses, 6 clue tiles (region, people, size, languages, coast, distance). **Shape**: country outline, 6 guesses, distance rows like Flag, continent hint after 3 and first letter after 5; answers skip countries under 1,000 km². Each has daily + unlimited. Planned: Border Hop (greyed "soon"). Data: built-in `COUNTRIES` (code, name, rough center) + `FACTS` (population from World Bank 2023, area/region/languages/capital/landlocked from mledoze/countries), baked in so nothing to fetch; flag images from flagcdn.com, no key |
+| `data/shapes.js` | Country outlines for World Clue Shape (`window.SHAPES`, SVG paths in a 1000×1000 box), built from Natural Earth 1:50m, far-off islands dropped. Loaded only when a Shape game starts |
 | `name-that-team.html` | **Name That Team**: Street View in an NHL city, pick which of the 32 teams plays there. Normal + hard mode. Daily / Unlimited / Challenge / Live. Same Google key + cap as Geo Clue |
 | `hometown-heroes.html` | **Hometown Heroes**: pin where an NHL player grew up (Kraken players badged). Same modes. Player list for review: `docs/hometown-heroes-players.md` |
 | `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so all three Street View games (Geo Clue, Name That Team, Hometown Heroes) work on every device |
@@ -28,7 +30,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
   - `#home` screen (today's status, play buttons, stats) → game → `#endS` end-of-game summary → back to home.
   - Top bar during play: ⌂ Home · Stats · ? · ⚙.
 - Daily puzzles are picked with a **seeded shuffle** (`mulberry32`) keyed by the local date, so everyone gets the same answer each day. Changing a song list, film pool, or seed changes which answer each day gets.
-- Saved data lives in the browser's `localStorage` (per device). Key prefixes: `rc:` Reel, `tc:` Tune, `gc:` Geo, `nt:` Name That Team, `hh:` Hometown Heroes (both read the Google key and cap from `gc:settings`).
+- Saved data lives in the browser's `localStorage` (per device). Key prefixes: `rc:` Reel, `tc:` Tune, `gc:` Geo, `wc:` World (`wc:<puzzle>:g:DATE`, `:stats`, `:unl`, `:ustats`, plus `wc:puz` = last tab), `nt:` Name That Team, `hh:` Hometown Heroes (both read the Google key and cap from `gc:settings`).
 
 ## Keys & environment variables (Vercel → clue-games → Settings → Environment Variables)
 | Variable | Used by | Notes |

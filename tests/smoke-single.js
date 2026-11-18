@@ -73,4 +73,56 @@ async function geoNoDb(){
  w.eval(src); await sleep(50);
  console.log('GEO   no database: home on',on(d,'#home'),'| meter:',d.querySelector('#hUsage').textContent.replace(/\s+/g,' ').trim());
 }
-(async()=>{await reel();await tune();await geo();await geoNoDb();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
+async function world(){
+ const {w,d,src}=make('world-clue.html');
+ w.eval(src+';window.__t={g:()=>game,guess,search,draw:drawShape,by:BY,pool:answerPool,all:COUNTRIES.length};');
+ await sleep(50);
+ const opened=()=>d.querySelectorAll('.cover.open').length;
+ console.log('WORLD start: home on',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| puzzles:',[...d.querySelectorAll('#hPuzzles button')].map(b=>b.textContent+(b.disabled?'(off)':'')).join(' '));
+ console.log('      search "usa" ->',w.__t.search('usa').map(c=>c.name).join(', '),'| "congo" ->',w.__t.search('congo').map(c=>c.name).join(', '));
+ d.querySelector('#hDaily').click(); await sleep(50);
+ const ans=w.__t.g().answer;
+ console.log('      playing: home on',on(d,'#home'),'| answer',ans,'| tiles open',opened(),'| empty rows',d.querySelectorAll('.grow.empty').length);
+ const wrong=['fr','jp','br'].filter(c=>c!==ans&&!({td:'ro',ro:'td',mc:'id',id:'mc'})[c]);
+ w.__t.guess(wrong[0]); w.__t.guess(wrong[1]);
+ console.log('      2 misses -> tiles open',opened(),'| row 1:',d.querySelector('.grow').textContent.replace(/\s+/g,' ').trim());
+ w.__t.guess(ans); await sleep(800);
+ console.log('      win -> end screen',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'| grid:',d.querySelector('.egrid').textContent.replace(/\n/g,' | '));
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      share text:',JSON.stringify(w.__copied));
+ d.querySelector('#eHome').click(); console.log('      back home',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| daily stats:',d.querySelector('#hStatsRow').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#hUnl').click(); await sleep(50);
+ const u=w.__t.g(); console.log('      unlimited: mode',u.mode,'| label',d.querySelector('#modeLbl').textContent);
+ for(const c of ['fr','jp','br','de','in','au'].filter(c=>!({[u.answer]:1})[c]&&!(({td:'ro',ro:'td',mc:'id',id:'mc'})[c]===u.answer)).slice(0,6)) w.__t.guess(c);
+ await sleep(800);
+ console.log('      6 misses -> done',u.done,'won',u.won,'| end:',d.querySelector('.endtitle').textContent,'| buttons:',[...d.querySelectorAll('#endBody button')].map(b=>b.textContent).join(' / '));
+ const first=u.answer; d.querySelector('#eNext').click(); await sleep(50);
+ console.log('      next flag -> new answer',w.__t.g().answer!==first,'| guesses',w.__t.g().guesses.length);
+ d.querySelector('#bHome').click(); console.log('      home unlimited stats:',d.querySelector('#hUStatsRow').textContent.replace(/\s+/g,' ').trim());
+ // ---- Country puzzle ----
+ d.querySelector('#hPuzzles button[data-p=country]').click();
+ console.log('WORLD country tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| btns:',d.querySelector('#hDaily').textContent,'/',d.querySelector('#hUnl').textContent);
+ d.querySelector('#hDaily').click(); await sleep(50);
+ const ca=w.__t.g().answer; console.log('      playing: answer',ca,'| flagbox hidden',d.querySelector('#flagbox').hidden,'| max',d.querySelector('#maxG').textContent,'| flag answer differs',ca!==ans);
+ const cw=['fr','jp'].filter(c=>c!==ca); w.__t.guess(cw[0]);
+ console.log('      row:',[...d.querySelectorAll('.crow .tile')].map(t=>t.className.split(' ')[1]+':'+t.textContent.replace(/\s+/g,' ').trim()).join(' | '));
+ w.__t.guess(ca); await sleep(1400);
+ console.log('      win -> end',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'|',d.querySelector('#endBody .tag:nth-of-type(3)')?.textContent||[...d.querySelectorAll('#endBody .tag')].map(t=>t.textContent).join(' // '));
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      share:',JSON.stringify(w.__copied));
+ d.querySelector('#eHome').click(); console.log('      home country stats:',d.querySelector('#hStatsRow').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#hPuzzles button[data-p=flag]').click(); console.log('      back to flag tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '));
+ // ---- Shape puzzle ---- (outline file is a separate script; the fake browser can't fetch it, so load it here)
+ d.querySelector('#hPuzzles button[data-p=shape]').click();
+ console.log('WORLD shape tab: card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| btns:',d.querySelector('#hDaily').textContent,'/',d.querySelector('#hUnl').textContent);
+ d.querySelector('#hDaily').click(); await sleep(50);
+ console.log('      before outlines load:',d.querySelector('#shapebox').textContent,'| script tag added',[...d.querySelectorAll('script')].some(s=>/shapes\.js/.test(s.src)));
+ w.eval(fs.readFileSync(path.join(ROOT,'data/shapes.js'),'utf8')); w.__t.draw();
+ const sa=w.__t.g().answer; const pth=d.querySelector('#shapebox path');
+ console.log('      playing: answer',sa,'area',w.__t.by[sa].area,'| outline chars',pth&&pth.getAttribute('d').length,'| flagbox hidden',d.querySelector('#flagbox').hidden,'| hint:',d.querySelector('#shint').textContent);
+ const sw=['fr','jp','br','au','ca'].filter(c=>c!==sa); for(const c of sw.slice(0,3)) w.__t.guess(c);
+ console.log('      3 misses -> hint:',d.querySelector('#shint').innerHTML.replace(/<\/?b>/g,''),'| rows',d.querySelectorAll('.grow:not(.empty)').length);
+ w.__t.guess(sw[3]); w.__t.guess(sw[4]); console.log('      5 misses -> hint:',d.querySelector('#shint').textContent);
+ w.__t.guess(sa); await sleep(800);
+ console.log('      win in 6 -> end',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'| share:',(d.querySelector('#eShare').click(),await sleep(10),JSON.stringify(w.__copied)));
+ const tiny=w.__t.pool().filter(c=>w.__t.by[c].area<1000); console.log('      shape answer pool',w.__t.pool().length,'of',w.__t.all,'| tiny in pool:',tiny.length);
+}
+(async()=>{await reel();await tune();await geo();await geoNoDb();await world();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
