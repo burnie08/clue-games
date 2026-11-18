@@ -73,4 +73,30 @@ async function geoNoDb(){
  w.eval(src); await sleep(50);
  console.log('GEO   no database: home on',on(d,'#home'),'| meter:',d.querySelector('#hUsage').textContent.replace(/\s+/g,' ').trim());
 }
-(async()=>{await reel();await tune();await geo();await geoNoDb();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});
+async function world(){
+ const {w,d,src}=make('world-clue.html');
+ w.eval(src+';window.__t={g:()=>game,guess,search};');
+ await sleep(50);
+ const opened=()=>d.querySelectorAll('.cover.open').length;
+ console.log('WORLD start: home on',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| puzzles:',[...d.querySelectorAll('#hPuzzles button')].map(b=>b.textContent+(b.disabled?'(off)':'')).join(' '));
+ console.log('      search "usa" ->',w.__t.search('usa').map(c=>c.name).join(', '),'| "congo" ->',w.__t.search('congo').map(c=>c.name).join(', '));
+ d.querySelector('#hDaily').click(); await sleep(50);
+ const ans=w.__t.g().answer;
+ console.log('      playing: home on',on(d,'#home'),'| answer',ans,'| tiles open',opened(),'| empty rows',d.querySelectorAll('.grow.empty').length);
+ const wrong=['fr','jp','br'].filter(c=>c!==ans&&!({td:'ro',ro:'td',mc:'id',id:'mc'})[c]);
+ w.__t.guess(wrong[0]); w.__t.guess(wrong[1]);
+ console.log('      2 misses -> tiles open',opened(),'| row 1:',d.querySelector('.grow').textContent.replace(/\s+/g,' ').trim());
+ w.__t.guess(ans); await sleep(800);
+ console.log('      win -> end screen',on(d,'#endS'),'|',d.querySelector('.endtitle').textContent,'| grid:',d.querySelector('.egrid').textContent.replace(/\n/g,' | '));
+ d.querySelector('#eShare').click(); await sleep(10); console.log('      share text:',JSON.stringify(w.__copied));
+ d.querySelector('#eHome').click(); console.log('      back home',on(d,'#home'),'| card:',d.querySelector('#todayCard').textContent.trim().replace(/\s+/g,' '),'| daily stats:',d.querySelector('#hStatsRow').textContent.replace(/\s+/g,' ').trim());
+ d.querySelector('#hUnl').click(); await sleep(50);
+ const u=w.__t.g(); console.log('      unlimited: mode',u.mode,'| label',d.querySelector('#modeLbl').textContent);
+ for(const c of ['fr','jp','br','de','in','au'].filter(c=>!({[u.answer]:1})[c]&&!(({td:'ro',ro:'td',mc:'id',id:'mc'})[c]===u.answer)).slice(0,6)) w.__t.guess(c);
+ await sleep(800);
+ console.log('      6 misses -> done',u.done,'won',u.won,'| end:',d.querySelector('.endtitle').textContent,'| buttons:',[...d.querySelectorAll('#endBody button')].map(b=>b.textContent).join(' / '));
+ const first=u.answer; d.querySelector('#eNext').click(); await sleep(50);
+ console.log('      next flag -> new answer',w.__t.g().answer!==first,'| guesses',w.__t.g().guesses.length);
+ d.querySelector('#bHome').click(); console.log('      home unlimited stats:',d.querySelector('#hUStatsRow').textContent.replace(/\s+/g,' ').trim());
+}
+(async()=>{await reel();await tune();await geo();await geoNoDb();await world();process.exit(0)})().catch(e=>{console.error('ERR',e);process.exit(1)});

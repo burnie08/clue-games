@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>World Clue</title>
+<style>
+:root{
+  --bg:#0f1117;--panel:#181b24;--panel2:#20242f;--text:#e9ecf2;--muted:#8b93a7;
+  --green:#3a9d4f;--gold:#c79a22;--gray:#343a48;--accent:#e4b343;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px}
+button{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:8px 12px;background:var(--panel2);color:var(--text)}
+button:hover:not(:disabled){filter:brightness(1.25)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:#1a1300;font-weight:600}
+input{font:inherit;background:var(--panel2);color:var(--text);border:1px solid #2f3442;border-radius:8px;padding:10px 12px;width:100%}
+a{color:var(--accent)}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;border-bottom:1px solid #232733;flex-wrap:wrap}
+.logo{font-weight:800;font-size:22px;letter-spacing:.5px;cursor:pointer}
+.logo span{color:var(--accent)}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+main{max-width:560px;margin:0 auto;padding:16px}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;color:var(--muted)}
+.bar b{color:var(--text)}
+#status{color:var(--muted);min-height:20px;margin:6px 0}
+
+/* flag board */
+.flagbox{position:relative;width:100%;aspect-ratio:3/2;background:var(--panel);border-radius:12px;overflow:hidden;margin-bottom:12px;border:2px solid #232733}
+.flagbox img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.covers{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr)}
+.cover{background:var(--panel2);border:1px solid var(--bg);transition:opacity .5s}
+.cover.open{opacity:0}
+.flagbox .err{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);text-align:center;padding:20px}
+
+.searchwrap{position:relative}
+#drop{position:absolute;left:0;right:0;top:100%;background:var(--panel);border:1px solid #2f3442;border-radius:8px;margin-top:4px;z-index:20;max-height:320px;overflow:auto;box-shadow:0 10px 30px #0008}
+.opt{padding:8px 12px;cursor:pointer}
+.opt.sel,.opt:hover{background:var(--panel2)}
+.opt small{color:var(--muted)}
+
+/* guess rows */
+.grow{display:grid;grid-template-columns:1fr 90px 44px 64px;gap:6px;margin:6px 0;animation:flip .4s both;transform-origin:center top}
+.grow>div{background:var(--gray);border-radius:8px;padding:9px 10px;display:flex;align-items:center;gap:8px;font-weight:600}
+.grow>div:not(:first-child){justify-content:center}
+.grow img{width:28px;height:19px;object-fit:cover;border-radius:3px;flex:none}
+.grow.win>div{background:var(--green)}
+.grow .pc.hot{background:var(--gold);color:#1a1300}
+.grow.empty>div{background:var(--panel);color:var(--muted);font-weight:400}
+.grow .arw{font-size:20px}
+.noanim{animation:none}
+@keyframes flip{0%{transform:rotateX(90deg);opacity:0}100%{transform:rotateX(0);opacity:1}}
+
+.endcard{display:flex;gap:14px;align-items:center;background:var(--panel);border-radius:12px;padding:14px;margin:12px 0;border:2px solid var(--gray)}
+.endcard.won{border-color:var(--green)}.endcard.lost{border-color:#a33}
+.endcard img{width:72px;border-radius:6px}
+.endcard h3{margin:0 0 8px;color:var(--accent)}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+
+#modal{position:fixed;inset:0;background:#000a;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal[hidden]{display:none}
+.mbox{background:var(--panel);border-radius:14px;padding:20px;max-width:520px;width:100%;max-height:90vh;overflow:auto;position:relative}
+.mbox h2{margin-top:0}
+.mbox .close{position:absolute;right:10px;top:10px;background:none;font-size:22px}
+.help{color:var(--muted);font-size:14px;line-height:1.5}
+.stats{display:flex;gap:10px;text-align:center;margin-bottom:16px}
+.stats div{flex:1;background:var(--panel2);border-radius:10px;padding:10px}
+.stats b{display:block;font-size:24px}
+.dist{display:flex;align-items:center;gap:6px;margin:3px 0;font-size:13px}
+.dist .b{background:var(--green);padding:2px 6px;border-radius:4px;min-width:22px;text-align:right}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
+#toast.show{opacity:1}
+footer{color:var(--muted);font-size:12px;text-align:center;padding:20px}
+
+/* home + end screens */
+.screen{position:fixed;inset:0;z-index:40;background:radial-gradient(circle at 50% 0%,#1f2433 0%,var(--bg) 55%);overflow:auto;display:none;justify-content:center;align-items:flex-start;padding:36px 16px 40px}
+.screen.on{display:flex}
+.hwrap{width:100%;max-width:520px;text-align:center}
+.hicon{font-size:54px;line-height:1}
+.hlogo{font-size:44px;font-weight:800;letter-spacing:.5px;margin:6px 0 8px}.hlogo span{color:var(--accent)}
+.hlogo.small{font-size:22px;margin:0 0 10px}
+.tag{color:var(--muted);line-height:1.5;margin:0 0 20px}
+.seg{display:flex;background:var(--panel);border-radius:12px;padding:4px;gap:4px;margin-bottom:14px}
+.seg button{flex:1;background:none;padding:10px 4px;font-size:14px}
+.seg button.on{background:var(--accent);color:#1a1300;font-weight:700}
+.seg button small{display:block;font-size:10px;opacity:.7}
+.today{background:var(--panel);border:1px solid #2a2f3c;border-radius:14px;padding:14px 16px;margin-bottom:14px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.today b{font-size:16px}.today .d{color:var(--muted);font-size:13px;margin-top:2px}.today .big{font-size:30px}
+.hbtns{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.hbtns button{padding:14px;font-size:17px;border-radius:12px}
+.hmini{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+.hmini button{padding:8px 14px;font-size:14px}
+.hstats{display:flex;gap:8px;margin-bottom:16px}
+.hstats div{flex:1;background:var(--panel);border-radius:10px;padding:8px;font-size:12px;color:var(--muted)}
+.hstats b{display:block;font-size:20px;color:var(--text)}
+.slabel{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px;margin:0 0 6px;text-align:left}
+.back{color:var(--muted);text-decoration:none;font-size:14px}.back:hover{color:var(--accent)}
+.endtitle{font-size:30px;font-weight:800;margin:0 0 4px}
+.endart{width:240px;max-width:70vw;border-radius:10px;box-shadow:0 10px 30px #0008;margin:6px auto 14px;display:block}
+.egrid{font-size:18px;line-height:1.3;margin:12px 0 16px;white-space:pre;overflow-x:auto}
+@media (max-width:480px){.grow{grid-template-columns:1fr 76px 36px 52px}.grow>div{padding:8px 6px;font-size:13px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">World<span>Clue</span></div>
+  <nav>
+    <button id="bHome">⌂ Home</button>
+    <button id="bStats">Stats</button>
+    <button id="bHelp">?</button>
+  </nav>
+</header>
+<main>
+  <div class="bar"><span id="modeLbl"></span><span>Guess <b id="count">0</b>/6</span></div>
+  <div class="flagbox" id="flagbox"></div>
+  <div class="searchwrap">
+    <input id="q" placeholder="Type a country…" autocomplete="off">
+    <div id="drop" hidden></div>
+  </div>
+  <div id="status"></div>
+  <div id="end" hidden></div>
+  <div id="rows"></div>
+</main>
+<footer>Flag images from <a href="https://flagcdn.com" target="_blank">flagcdn.com</a>. Distances are between country centers. · <a href="index.html">All games</a></footer>
+<div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
+<div id="toast"></div>
+
+<section id="home" class="screen"><div class="hwrap">
+  <div class="hicon">🗺️</div>
+  <div class="hlogo">World<span>Clue</span></div>
+  <p class="tag">Daily geography puzzles. Guess the country in 6 tries. Each miss shows how far away you are and which way to go.</p>
+  <div class="seg" id="hPuzzles">
+    <button class="on" data-p="flag">🏳️ Flag</button>
+    <button disabled>🔤 Country<small>soon</small></button>
+    <button disabled>🗾 Shape<small>soon</small></button>
+    <button disabled>🔗 Border Hop<small>soon</small></button>
+  </div>
+  <div class="today" id="todayCard"></div>
+  <div class="hbtns">
+    <button class="primary" id="hDaily">Play today's flag</button>
+    <button id="hUnl">Unlimited · random flags</button>
+  </div>
+  <div class="slabel">Daily</div>
+  <div id="hStatsRow"></div>
+  <div class="slabel">Unlimited</div>
+  <div id="hUStatsRow"></div>
+  <div class="hmini"><button id="hHow">How to play</button><button id="hStats">Stats</button></div>
+  <a class="back" href="index.html">← All games</a>
+</div></section>
+<section id="endS" class="screen"><div class="hwrap" id="endBody"></div></section>
+
+<script>
+// ---------- countries: [code, name, lat, lng, aliases] (lat/lng = rough center) ----------
+const COUNTRIES = [
+['af','Afghanistan',33.9,67.7],['al','Albania',41.2,20.2],['dz','Algeria',28.0,1.7],['ad','Andorra',42.5,1.5],
+['ao','Angola',-11.2,17.9],['ag','Antigua and Barbuda',17.1,-61.8],['ar','Argentina',-38.4,-63.6],['am','Armenia',40.1,45.0],
+['au','Australia',-25.3,133.8],['at','Austria',47.5,14.6],['az','Azerbaijan',40.1,47.6],['bs','Bahamas',25.0,-77.4],
+['bh','Bahrain',26.0,50.6],['bd','Bangladesh',23.7,90.4],['bb','Barbados',13.2,-59.5],['by','Belarus',53.7,28.0],
+['be','Belgium',50.5,4.5],['bz','Belize',17.2,-88.5],['bj','Benin',9.3,2.3],['bt','Bhutan',27.5,90.4],
+['bo','Bolivia',-16.3,-63.6],['ba','Bosnia and Herzegovina',43.9,17.7,['Bosnia']],['bw','Botswana',-22.3,24.7],['br','Brazil',-14.2,-51.9],
+['bn','Brunei',4.5,114.7],['bg','Bulgaria',42.7,25.5],['bf','Burkina Faso',12.2,-1.6],['bi','Burundi',-3.4,29.9],
+['cv','Cape Verde',16.0,-24.0,['Cabo Verde']],['kh','Cambodia',12.6,105.0],['cm','Cameroon',7.4,12.4],['ca','Canada',56.1,-106.3],
+['cf','Central African Republic',6.6,20.9,['CAR']],['td','Chad',15.5,18.7],['cl','Chile',-35.7,-71.5],['cn','China',35.9,104.2],
+['co','Colombia',4.6,-74.3],['km','Comoros',-11.9,43.9],['cg','Republic of the Congo',-0.2,15.8,['Congo','Congo-Brazzaville']],
+['cd','DR Congo',-4.0,21.8,['Democratic Republic of the Congo','DRC','Congo-Kinshasa']],
+['cr','Costa Rica',9.7,-83.8],['ci','Ivory Coast',7.5,-5.5,["Cote d'Ivoire"]],['hr','Croatia',45.1,15.2],['cu','Cuba',21.5,-77.8],
+['cy','Cyprus',35.1,33.4],['cz','Czechia',49.8,15.5,['Czech Republic']],['dk','Denmark',56.3,9.5],['dj','Djibouti',11.8,42.6],
+['dm','Dominica',15.4,-61.4],['do','Dominican Republic',18.7,-70.2],['ec','Ecuador',-1.8,-78.2],['eg','Egypt',26.8,30.8],
+['sv','El Salvador',13.8,-88.9],['gq','Equatorial Guinea',1.7,10.3],['er','Eritrea',15.2,39.8],['ee','Estonia',58.6,25.0],
+['sz','Eswatini',-26.5,31.5,['Swaziland']],['et','Ethiopia',9.1,40.5],['fj','Fiji',-17.7,178.1],['fi','Finland',61.9,25.7],
+['fr','France',46.2,2.2],['ga','Gabon',-0.8,11.6],['gm','Gambia',13.4,-15.3],['ge','Georgia',42.3,43.4],
+['de','Germany',51.2,10.5],['gh','Ghana',7.9,-1.0],['gr','Greece',39.1,21.8],['gd','Grenada',12.1,-61.7],
+['gt','Guatemala',15.8,-90.2],['gn','Guinea',9.9,-9.7],['gw','Guinea-Bissau',11.8,-15.2],['gy','Guyana',4.9,-58.9],
+['ht','Haiti',19.0,-72.3],['hn','Honduras',15.2,-86.2],['hu','Hungary',47.2,19.5],['is','Iceland',65.0,-19.0],
+['in','India',20.6,79.0],['id','Indonesia',-0.8,113.9],['ir','Iran',32.4,53.7],['iq','Iraq',33.2,43.7],
+['ie','Ireland',53.4,-8.2],['il','Israel',31.0,34.9],['it','Italy',41.9,12.6],['jm','Jamaica',18.1,-77.3],
+['jp','Japan',36.2,138.3],['jo','Jordan',30.6,36.2],['kz','Kazakhstan',48.0,66.9],['ke','Kenya',0.0,37.9],
+['ki','Kiribati',1.4,173.0],['xk','Kosovo',42.6,20.9],['kw','Kuwait',29.3,47.5],['kg','Kyrgyzstan',41.2,74.8],
+['la','Laos',19.9,102.5],['lv','Latvia',56.9,24.6],['lb','Lebanon',33.9,35.9],['ls','Lesotho',-29.6,28.2],
+['lr','Liberia',6.4,-9.4],['ly','Libya',26.3,17.2],['li','Liechtenstein',47.2,9.6],['lt','Lithuania',55.2,23.9],
+['lu','Luxembourg',49.8,6.1],['mg','Madagascar',-18.8,46.9],['mw','Malawi',-13.3,34.3],['my','Malaysia',4.2,102.0],
+['mv','Maldives',3.2,73.2],['ml','Mali',17.6,-4.0],['mt','Malta',35.9,14.4],['mh','Marshall Islands',7.1,171.2],
+['mr','Mauritania',21.0,-10.9],['mu','Mauritius',-20.3,57.6],['mx','Mexico',23.6,-102.6],['fm','Micronesia',6.9,158.2],
+['md','Moldova',47.4,28.4],['mc','Monaco',43.7,7.4],['mn','Mongolia',46.9,103.8],['me','Montenegro',42.7,19.4],
+['ma','Morocco',31.8,-7.1],['mz','Mozambique',-18.7,35.5],['mm','Myanmar',21.9,96.0,['Burma']],['na','Namibia',-23.0,18.5],
+['nr','Nauru',-0.5,166.9],['np','Nepal',28.4,84.1],['nl','Netherlands',52.1,5.3,['Holland']],['nz','New Zealand',-40.9,174.9],
+['ni','Nicaragua',12.9,-85.2],['ne','Niger',17.6,8.1],['ng','Nigeria',9.1,8.7],['kp','North Korea',40.3,127.5,['DPRK']],
+['mk','North Macedonia',41.6,21.7,['Macedonia']],['no','Norway',60.5,8.5],['om','Oman',21.5,55.9],['pk','Pakistan',30.4,69.3],
+['pw','Palau',7.5,134.6],['ps','Palestine',31.9,35.2],['pa','Panama',8.5,-80.8],['pg','Papua New Guinea',-6.3,144.0,['PNG']],
+['py','Paraguay',-23.4,-58.4],['pe','Peru',-9.2,-75.0],['ph','Philippines',12.9,121.8],['pl','Poland',51.9,19.1],
+['pt','Portugal',39.4,-8.2],['qa','Qatar',25.4,51.2],['ro','Romania',45.9,25.0],['ru','Russia',61.5,105.3],
+['rw','Rwanda',-1.9,29.9],['kn','Saint Kitts and Nevis',17.4,-62.8,['St Kitts']],['lc','Saint Lucia',13.9,-61.0,['St Lucia']],
+['vc','Saint Vincent and the Grenadines',13.3,-61.2,['St Vincent']],['ws','Samoa',-13.8,-172.1],['sm','San Marino',43.9,12.5],
+['st','Sao Tome and Principe',0.2,6.6],['sa','Saudi Arabia',23.9,45.1],['sn','Senegal',14.5,-14.5],['rs','Serbia',44.0,21.0],
+['sc','Seychelles',-4.7,55.5],['sl','Sierra Leone',8.5,-11.8],['sg','Singapore',1.35,103.8],['sk','Slovakia',48.7,19.7],
+['si','Slovenia',46.2,15.0],['sb','Solomon Islands',-9.6,160.2],['so','Somalia',5.2,46.2],['za','South Africa',-30.6,22.9],
+['kr','South Korea',35.9,127.8,['Korea']],['ss','South Sudan',6.9,31.3],['es','Spain',40.5,-3.7],['lk','Sri Lanka',7.9,80.8],
+['sd','Sudan',12.9,30.2],['sr','Suriname',3.9,-56.0],['se','Sweden',60.1,18.6],['ch','Switzerland',46.8,8.2],
+['sy','Syria',34.8,39.0],['tw','Taiwan',23.7,121.0],['tj','Tajikistan',38.9,71.3],['tz','Tanzania',-6.4,34.9],
+['th','Thailand',15.9,101.0],['tl','Timor-Leste',-8.9,125.7,['East Timor']],['tg','Togo',8.6,0.8],['to','Tonga',-21.2,-175.2],
+['tt','Trinidad and Tobago',10.7,-61.2,['Trinidad']],['tn','Tunisia',33.9,9.5],['tr','Turkey',39.0,35.2,['Turkiye']],['tm','Turkmenistan',39.0,59.6],
+['tv','Tuvalu',-7.1,177.6],['ug','Uganda',1.4,32.3],['ua','Ukraine',48.4,31.2],['ae','United Arab Emirates',23.4,53.8,['UAE']],
+['gb','United Kingdom',55.4,-3.4,['UK','Great Britain','Britain','England']],['us','United States',37.1,-95.7,['USA','US','America','United States of America']],
+['uy','Uruguay',-32.5,-55.8],['uz','Uzbekistan',41.4,64.6],['vu','Vanuatu',-15.4,167.0],['va','Vatican City',41.9,12.45,['Holy See','Vatican']],
+['ve','Venezuela',6.4,-66.6],['vn','Vietnam',14.1,108.3],['ye','Yemen',15.6,48.5],['zm','Zambia',-13.1,27.8],['zw','Zimbabwe',-19.0,29.2]
+].map(([code, name, lat, lng, aka]) => ({ code, name, lat, lng, aka: aka || [] }));
+const BY = Object.fromEntries(COUNTRIES.map(c => [c.code, c]));
+// Flags that look the same: guessing the twin counts as a win.
+const TWINS = { td: 'ro', ro: 'td', mc: 'id', id: 'mc' };
+
+// ---------- helpers ----------
+const MAX = 6, TILES = 6;
+const $ = s => document.querySelector(s);
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+const pad = n => String(n).padStart(2, '0');
+function dateKey(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+function dayNum(key) { const [y, m, d] = key.split('-').map(Number); return Math.floor(Date.UTC(y, m - 1, d) / 864e5); }
+function niceDate(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); }
+function toast(t) { const e = $('#toast'); e.textContent = t; e.classList.add('show'); setTimeout(() => e.classList.remove('show'), 1600); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function shuffle(arr, seed) {
+  const r = mulberry32(seed), a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z ]/g, '').trim();
+const flagUrl = (code, w) => `https://flagcdn.com/w${w}/${code}.png`;
+
+// ---------- geography ----------
+const rad = d => d * Math.PI / 180;
+function km(a, b) {
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(6371 * 2 * Math.asin(Math.sqrt(h)));
+}
+function bearing(a, b) {
+  const y = Math.sin(rad(b.lng - a.lng)) * Math.cos(rad(b.lat));
+  const x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) - Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lng - a.lng));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+const ARROWS = ['⬆️', '↗️', '➡️', '↘️', '⬇️', '↙️', '⬅️', '↖️'];
+const arrow = deg => ARROWS[Math.round(deg / 45) % 8];
+const proximity = d => Math.max(0, Math.round(100 - d / 20015 * 100)); // 20,015 km = half the world
+function isWin(guess, ans) { return guess === ans || TWINS[guess] === ans; }
+function compare(code) {
+  const g = BY[code], a = BY[game.answer];
+  if (isWin(code, game.answer)) return { win: true, km: 0, arrow: '🎉', pct: 100 };
+  const d = km(g, a);
+  return { win: false, km: d, arrow: arrow(bearing(g, a)), pct: proximity(d) };
+}
+function squares(pct) { const full = Math.floor(pct / 20), half = full < 5 && pct % 20 >= 10 ? 1 : 0; return '🟩'.repeat(full) + '🟨'.repeat(half) + '⬛'.repeat(5 - full - half); }
+
+// ---------- game ----------
+let game = null, endDismissed = false;
+const DAILY_POOL = shuffle(COUNTRIES.map(c => c.code).sort(), 20261117);
+
+function dailyAnswer(key) { return DAILY_POOL[dayNum(key) % DAILY_POOL.length]; }
+function newGame(key, mode, answer) {
+  // which tile opens at each step: same order for everyone on a daily, random on unlimited
+  const seed = mode === 'daily' ? dayNum(key) * 7 + 3 : Math.floor(Math.random() * 1e9);
+  const order = shuffle([0, 1, 2, 3, 4, 5], seed);
+  return { key, mode, answer, order, guesses: [], done: false, won: false };
+}
+function save() { LS.set(game.mode === 'unlimited' ? 'wc:flag:unl' : 'wc:flag:g:' + game.key, game); }
+
+function startDaily(key) {
+  hideHome();
+  const answer = dailyAnswer(key), saved = LS.get('wc:flag:g:' + key, null);
+  game = saved && saved.answer === answer ? saved : newGame(key, 'daily', answer);
+  loadGame();
+}
+function startUnlimited(fresh) {
+  hideHome();
+  let saved = LS.get('wc:flag:unl', null);
+  if (!saved || fresh) {
+    const last = saved && saved.answer;
+    let pick;
+    do pick = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)].code; while (pick === last);
+    saved = newGame('unl', 'unlimited', pick);
+  }
+  game = saved; save();
+  loadGame();
+}
+function loadGame() {
+  endDismissed = false;
+  $('#rows').innerHTML = '';
+  $('#flagbox').innerHTML = `<img id="flagImg" alt="Mystery flag" src="${flagUrl(game.answer, 640)}"><div class="covers">${Array.from({ length: TILES }, (_, i) => `<div class="cover" data-i="${i}"></div>`).join('')}</div>`;
+  $('#flagImg').onerror = () => { $('#flagbox').innerHTML = '<div class="err">The flag picture would not load. Check your internet and reload.</div>'; };
+  renderRows(false);
+  renderMeta();
+  if (!game.done) setTimeout(() => $('#q').focus(), 50);
+}
+function openTiles() {
+  const n = game.done ? TILES : Math.min(TILES, 1 + game.guesses.length);
+  const open = new Set(game.order.slice(0, n));
+  document.querySelectorAll('.cover').forEach(c => c.classList.toggle('open', open.has(+c.dataset.i)));
+}
+function rowHtml(code, animate) {
+  const c = BY[code], r = compare(code);
+  return `<div class="grow${r.win ? ' win' : ''}${animate ? '' : ' noanim'}">
+    <div><img src="${flagUrl(code, 40)}" alt="">${esc(c.name)}</div>
+    <div>${r.win ? '✓' : r.km.toLocaleString() + ' km'}</div>
+    <div class="arw">${r.arrow}</div>
+    <div class="pc${!r.win && r.pct >= 90 ? ' hot' : ''}">${r.pct}%</div></div>`;
+}
+function renderRows(animateLast) {
+  const g = game.guesses;
+  let html = g.map((code, i) => rowHtml(code, animateLast && i === g.length - 1)).join('');
+  if (!game.done) for (let i = g.length; i < MAX; i++) html += '<div class="grow empty noanim"><div>&nbsp;</div><div></div><div></div><div></div></div>';
+  $('#rows').innerHTML = html;
+}
+
+function guess(code) {
+  if (!game || game.done || !BY[code]) return;
+  if (game.guesses.includes(code)) { toast('Already guessed that one'); return; }
+  game.guesses.push(code);
+  if (isWin(code, game.answer)) { game.done = true; game.won = true; }
+  else if (game.guesses.length >= MAX) game.done = true;
+  save();
+  if (game.done) recordStat();
+  renderRows(true);
+  renderMeta();
+}
+
+function renderMeta() {
+  const today = dateKey(new Date());
+  $('#modeLbl').innerHTML = game.mode === 'unlimited' ? '<b>Unlimited</b> · Flag' : `<b>${game.key === today ? 'Daily' : 'Past'} flag</b> · ${niceDate(game.key)}`;
+  $('#count').textContent = game.guesses.length;
+  $('#q').disabled = game.done;
+  $('#q').placeholder = game.done ? 'Game over' : 'Type a country…';
+  openTiles();
+  renderEnd();
+}
+
+function emojiRows() { return game.guesses.map(code => { const r = compare(code); return r.win ? '🟩🟩🟩🟩🟩 🎉' : squares(r.pct) + ' ' + r.arrow; }); }
+function shareText() {
+  const label = game.mode === 'unlimited' ? 'Unlimited' : game.key;
+  return `World Clue 🏳️ Flag ${label} ${game.won ? game.guesses.length : 'X'}/${MAX}\n` + emojiRows().join('\n');
+}
+async function copy(t) {
+  try { await navigator.clipboard.writeText(t); }
+  catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  toast('Copied!');
+}
+
+function renderEnd() {
+  const box = $('#end');
+  if (!game.done) { box.hidden = true; $('#endS').classList.remove('on'); return; }
+  const a = BY[game.answer];
+  box.hidden = false;
+  box.innerHTML = `<div class="endcard ${game.won ? 'won' : 'lost'}"><img src="${flagUrl(a.code, 160)}" alt="">
+    <div><h3>${esc(a.name)}</h3><div class="btns"><button class="primary" id="sumBtn">Show summary</button>${game.mode === 'unlimited' ? '<button id="nextBtn2">Next flag →</button>' : ''}<button id="homeBtn2">⌂ Home</button></div></div></div>`;
+  $('#sumBtn').onclick = openEnd;
+  $('#homeBtn2').onclick = showHome;
+  if ($('#nextBtn2')) $('#nextBtn2').onclick = () => startUnlimited(true);
+  if (!endDismissed) setTimeout(openEnd, 700);
+}
+function openEnd() {
+  if (!game || !game.done) return;
+  const a = BY[game.answer], n = game.guesses.length, daily = game.mode !== 'unlimited';
+  $('#endBody').innerHTML = `
+    <div class="hlogo small">World<span>Clue</span></div>
+    <p class="endtitle">${game.won ? `Got it in ${n}! 🎉` : 'Out of guesses'}</p>
+    <p class="tag" style="margin-bottom:8px">${daily ? 'Daily flag · ' + niceDate(game.key) : 'Unlimited flag'}</p>
+    <img class="endart" src="${flagUrl(a.code, 640)}" alt="">
+    <h2 style="margin:0 0 6px">${esc(a.name)}</h2>
+    <div class="egrid">${emojiRows().join('\n')}</div>
+    ${daily ? statsRow() : uStatsRow()}
+    <div class="hbtns">
+      ${daily ? '' : '<button class="primary" id="eNext">Next flag →</button>'}
+      <button ${daily ? 'class="primary"' : ''} id="eShare">Copy result</button>
+      <button id="eBoard">View my guesses</button>
+      <button id="eHome">⌂ Back to home</button>
+    </div>`;
+  $('#eShare').onclick = () => copy(shareText());
+  if ($('#eNext')) $('#eNext').onclick = () => startUnlimited(true);
+  $('#eBoard').onclick = () => { endDismissed = true; $('#endS').classList.remove('on'); };
+  $('#eHome').onclick = showHome;
+  $('#endS').classList.add('on'); $('#endS').scrollTop = 0;
+}
+
+// ---------- stats ----------
+function recordStat() {
+  if (game.mode === 'unlimited') {
+    const u = Object.assign({ played: 0, wins: 0, streak: 0, best: 0, dist: Array(MAX).fill(0) }, LS.get('wc:flag:ustats', {}));
+    u.played++;
+    if (game.won) { u.wins++; u.streak++; u.best = Math.max(u.best, u.streak); u.dist[game.guesses.length - 1]++; } else u.streak = 0;
+    LS.set('wc:flag:ustats', u);
+  } else {
+    const s = LS.get('wc:flag:stats', {});
+    if (!(game.key in s)) { s[game.key] = game.won ? game.guesses.length : 0; LS.set('wc:flag:stats', s); }
+  }
+}
+function streakOf(s) { let n = 0; const d = new Date(); if (!(dateKey(d) in s)) d.setDate(d.getDate() - 1); while (s[dateKey(d)] > 0) { n++; d.setDate(d.getDate() - 1); } return n; }
+function row3(a, b, c) { return `<div class="hstats"><div><b>${a[0]}</b>${a[1]}</div><div><b>${b[0]}</b>${b[1]}</div><div><b>${c[0]}</b>${c[1]}</div></div>`; }
+const pctOf = (w, p) => (p ? Math.round(w / p * 100) : 0) + '%';
+function statsRow() {
+  const s = LS.get('wc:flag:stats', {}), v = Object.values(s), wins = v.filter(x => x > 0).length;
+  return row3([v.length, 'Played'], [pctOf(wins, v.length), 'Win rate'], [streakOf(s), 'Streak']);
+}
+function uStats() { return Object.assign({ played: 0, wins: 0, streak: 0, best: 0, dist: Array(MAX).fill(0) }, LS.get('wc:flag:ustats', {})); }
+function uStatsRow() { const u = uStats(); return row3([u.played, 'Played'], [pctOf(u.wins, u.played), 'Win rate'], [u.streak + ' / ' + u.best, 'Streak / best']); }
+function distHtml(dist) {
+  const mx = Math.max(1, ...dist);
+  return dist.map((c, i) => `<div class="dist"><span style="width:16px">${i + 1}</span><span class="b" style="width:${Math.max(6, c / mx * 100)}%">${c}</span></div>`).join('');
+}
+function openStats() {
+  const s = LS.get('wc:flag:stats', {}), dist = Array(MAX).fill(0);
+  Object.values(s).forEach(v => { if (v > 0) dist[v - 1]++; });
+  const u = uStats();
+  openModal(`<h2>Flag stats</h2>
+  <div class="help">Daily</div>${statsRow()}<div class="help">Guess distribution</div>${distHtml(dist)}
+  <div class="help" style="margin-top:16px">Unlimited</div>${uStatsRow()}<div class="help">Guess distribution</div>${distHtml(u.dist)}`);
+}
+function openHelp() {
+  openModal(`<h2>How to play</h2><div class="help">
+  <p>A mystery flag is hidden under 6 tiles. One tile starts open. Guess the country in <b>6 tries</b>.</p>
+  <p>Each wrong guess opens one more tile and shows:</p>
+  <ul><li><b>Distance</b> from your guess to the answer.</li>
+  <li><b>Arrow</b> pointing the way to the answer.</li>
+  <li><b>Closeness</b> from 0% on the other side of the world to 100% right on it.</li></ul>
+  <p>Distances run between the middle of each country, so neighbors can still look far apart.</p>
+  <p><b>Daily</b> is the same flag for everyone and changes at midnight. <b>Unlimited</b> gives a random flag any time with its own stats.</p></div>`);
+}
+function openModal(html) { $('#mbody').innerHTML = html; $('#modal').hidden = false; }
+function closeModal() { $('#modal').hidden = true; }
+$('#mclose').onclick = closeModal;
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+$('#bHome').onclick = showHome;
+$('.logo').onclick = showHome;
+$('#bStats').onclick = openStats;
+$('#bHelp').onclick = openHelp;
+
+// ---------- home ----------
+function showHome() { $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
+function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
+function renderHome() {
+  const today = dateKey(new Date()), g = LS.get('wc:flag:g:' + today, null);
+  let status, icon = '🏳️', label;
+  if (!g || !g.guesses.length) { status = `<b>Today's flag is waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's flag"; }
+  else if (!g.done) { status = `<b>In progress · ${g.guesses.length}/${MAX} guesses</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
+  else { status = `<b>${g.won ? `Solved in ${g.guesses.length}` : 'Missed today'}</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = g.won ? '✅' : '❌'; label = "See today's result"; }
+  $('#todayCard').innerHTML = `<div>${status}</div><div class="big">${icon}</div>`;
+  $('#hDaily').textContent = label;
+  $('#hStatsRow').innerHTML = statsRow();
+  $('#hUStatsRow').innerHTML = uStatsRow();
+  const u = LS.get('wc:flag:unl', null);
+  $('#hUnl').textContent = u && !u.done && u.guesses.length ? `Continue unlimited · ${u.guesses.length}/${MAX}` : 'Unlimited · random flags';
+}
+$('#hDaily').onclick = () => startDaily(dateKey(new Date()));
+$('#hUnl').onclick = () => startUnlimited(false);
+$('#hHow').onclick = openHelp;
+$('#hStats').onclick = openStats;
+
+// ---------- search ----------
+let sel = -1, results = [];
+const q = $('#q'), drop = $('#drop');
+function search(v) {
+  const n = norm(v); if (!n) return [];
+  const score = c => {
+    const names = [c.name, ...c.aka].map(norm);
+    if (names.some(x => x === n)) return 0;
+    if (names.some(x => x.startsWith(n))) return 1;
+    if (names.some(x => x.split(' ').some(w => w.startsWith(n)))) return 2;
+    if (n.length >= 3 && names.some(x => x.includes(n))) return 3;
+    return 9;
+  };
+  return COUNTRIES.map(c => [score(c), c]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || a[1].name.localeCompare(b[1].name)).slice(0, 8).map(x => x[1]);
+}
+q.addEventListener('input', () => { results = search(q.value); sel = results.length ? 0 : -1; renderDrop(); });
+function renderDrop() {
+  if (!q.value.trim()) { drop.hidden = true; return; }
+  if (!results.length) { drop.innerHTML = '<div class="opt"><small>No matches</small></div>'; drop.hidden = false; return; }
+  drop.innerHTML = results.map((c, i) => `<div class="opt ${i === sel ? 'sel' : ''}" data-i="${i}">${esc(c.name)}${game && game.guesses.includes(c.code) ? ' <small>· guessed</small>' : ''}</div>`).join('');
+  drop.hidden = false;
+  drop.querySelectorAll('.opt[data-i]').forEach(o => o.onmousedown = e => { e.preventDefault(); pick(+o.dataset.i); });
+}
+function pick(i) { const c = results[i]; if (!c) return; q.value = ''; drop.hidden = true; results = []; guess(c.code); }
+q.addEventListener('keydown', e => {
+  if (drop.hidden || !results.length) return;
+  if (e.key === 'ArrowDown') { sel = (sel + 1) % results.length; renderDrop(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { sel = (sel - 1 + results.length) % results.length; renderDrop(); e.preventDefault(); }
+  else if (e.key === 'Enter') { pick(sel); e.preventDefault(); }
+  else if (e.key === 'Escape') drop.hidden = true;
+});
+q.addEventListener('blur', () => setTimeout(() => drop.hidden = true, 150));
+
+// ---------- init ----------
+showHome();
+</script>
+</body>
+</html>
