@@ -756,12 +756,21 @@ function createRoom() {
     } catch (e) { live = null; showHome(); apiError(e); }
   });
 }
+const GAME_PAGES = { geo: 'geo-clue.html', ntt: 'name-that-team.html', hh: 'hometown-heroes.html' };
+function goPage(url) { location.replace(url); }
+// a room made for another game: hand over to that game's page (returns true if redirected)
+function otherGame(room, code) {
+  const g = (room && room.settings && room.settings.game) || 'geo';
+  if (g === 'geo' || !GAME_PAGES[g]) return false;
+  goPage(GAME_PAGES[g] + '?room=' + code); return true;
+}
 function joinRoom(code) {
   code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (code.length < 4) { toast('Enter the 4-letter room code'); return; }
   askName(async () => {
     live = { code };
-    try { await api('join'); } catch (e) { live = null; apiError(e); return; }
+    let jr; try { jr = await api('join'); } catch (e) { live = null; apiError(e); return; }
+    if (otherGame({ settings: { game: jr && jr.game } }, code)) return;
     hideHome();
     if (!(await boot())) return;
     enterRoom(code);
@@ -804,6 +813,7 @@ async function pollRoom() {
   if (!live || d.room.code !== live.code) return;
   live.data = d; live.skew = d.now - Date.now();
   const room = d.room;
+  if (otherGame(room, room.code)) { clearInterval(pollId); return; }
   if (room.state === 'lobby') return renderLobby(d);
   $('#lobby').classList.remove('on');
   if (!game || game.mode !== 'live' || game.code !== room.code) setupLiveGame(room);
