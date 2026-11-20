@@ -23,6 +23,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 | `hometown-heroes.html` | **Hometown Heroes**: pin where an NHL player grew up (Kraken players badged). Same modes. Player list for review: `docs/hometown-heroes-players.md` |
 | `api/config.js` | Vercel function: returns `GOOGLE_MAPS_KEY` so all three Street View games (Geo Clue, Name That Team, Hometown Heroes) work on every device |
 | `api/room.js` | Vercel function: live rooms for all three Street View games (`settings.game` = `geo` / `ntt` / `hh` says which page a room belongs to), stored in Upstash Redis |
+| `api/tmdb.js` | Vercel function: passes Reel Clue's TMDB lookups through using `TMDB_KEY`, so players need no key and the key stays hidden. Only allows configuration, discover/search movie and movie/ID |
 | `api/usage.js` | Vercel function: shared monthly Street View counter for all players (Redis key `gc:usage:YYYY-MM`, UTC month) |
 | `tests/` | Smoke tests that run the games in a fake browser with fake APIs (see Testing) |
 
@@ -39,7 +40,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 |---|---|---|
 | `GOOGLE_MAPS_KEY` | Geo Clue via `/api/config` | Browser key, restricted in Google Cloud to the site's address + Maps JavaScript API only |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | `/api/room` | Free Upstash database (created on upstash.com). `KV_REST_API_URL` / `KV_REST_API_TOKEN` also work |
-| (none) | Reel Clue | Each browser pastes its own TMDB key in ⚙ Settings |
+| `TMDB_KEY` | Reel Clue via `/api/tmdb` | Same TMDB key as Cinemania. A key pasted in ⚙ Settings is used first; if TMDB rejects it the game falls back to this one. From a local file there is no site key, so a pasted key is needed |
 | (none) | Tune Clue | iTunes needs no key; called with JSONP so it also works from a local file |
 
 **Never commit API keys.** The repo is public.
