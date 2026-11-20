@@ -204,13 +204,30 @@ function shuffled(ids) {
 let settings = Object.assign({ key: '', region: 'US', poolSize: 500 }, LS.get('rc:settings', {}));
 
 // ---------- TMDB ----------
-async function tmdb(path, params = {}) {
-  const u = new URL(API + path);
-  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+// Pasted keys often carry extra bits: spaces or line breaks, quotes, "Bearer ", "api_key=".
+function cleanKey(s) {
+  return String(s || '').replace(/\s+/g, '').replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/^bearer/i, '').replace(/^(api_key|apikey|key)[:=]/i, '').replace(/^["'`]+|["'`]+$/g, '');
+}
+// On the hosted site, the site's own key (Vercel TMDB_KEY, via /api/tmdb) is used unless you paste your own.
+let shared = /^https?:$/.test(location.protocol);
+const hasKey = () => !!settings.key || shared;
+async function tmdb(path, params = {}, useShared = false) {
+  const key = useShared || tmdb.ownBad ? '' : cleanKey(settings.key);
   const headers = { accept: 'application/json' };
-  const key = settings.key.trim();
-  if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key; else u.searchParams.set('api_key', key);
+  let u;
+  if (key) {
+    u = new URL(API + path);
+    if (key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key; else u.searchParams.set('api_key', key);
+  } else {
+    u = new URL('/api/tmdb', location.href);
+    u.searchParams.set('path', path);
+  }
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
   const r = await fetch(u, { headers });
+  // Your own key was rejected: fall back to the site's key if there is one.
+  if (key && r.status === 401 && shared && !tmdb.checking) { tmdb.ownBad = true; return tmdb(path, params, true); }
+  if (!key && r.status === 503) { shared = false; throw new Error('No shared movie key on this site yet. Add your own TMDB key in ⚙ Settings.'); }
   if (!r.ok) throw new Error('TMDB error ' + r.status + (r.status === 401 ? ' (bad API key?)' : ''));
   return r.json();
 }
@@ -486,14 +503,27 @@ function openSettings(first) {
   const regions = ['US', 'CA', 'GB', 'AU', 'NZ', 'IE', 'DE', 'FR'];
   openModal(`<h2>${first ? 'Welcome to Reel Clue' : 'Settings'}</h2>
   ${first ? '<p class="help">To play, paste a free TMDB API key. Get one at <a href="https://www.themoviedb.org/settings/api" target="_blank">themoviedb.org/settings/api</a> (either the "API Key" or the "API Read Access Token" works). It\'s stored only in this browser.</p>' : ''}
-  <label>TMDB API key or read access token</label><input id="sKey" value="${esc(settings.key)}" placeholder="paste key here">
+  <label>TMDB API key or read access token${shared ? ' (optional)' : ''}</label><input id="sKey" value="${esc(settings.key)}" placeholder="${shared ? 'leave empty to use the site\'s key' : 'paste key here'}"><p class="help" id="sErr" style="color:#ff7a7a" hidden></p>
   <label>Rating region</label><select id="sRegion">${regions.map(r => `<option ${r === settings.region ? 'selected' : ''}>${r}</option>`).join('')}</select>
   <label>Mystery film pool (most-voted films on TMDB)</label><select id="sPool">${[250, 500, 1000, 2000].map(n => `<option value="${n}" ${n === settings.poolSize ? 'selected' : ''}>Top ${n}${n === 500 ? ' (default)' : ''}</option>`).join('')}</select>
   <p class="help">Bigger pool = more obscure films. Changing it changes which film each day picks.</p>
   <div class="btns" style="margin-top:14px"><button class="primary" id="sSave">Save & play</button>${first ? '' : '<button id="sRebuild">Rebuild film pool</button>'}</div>`);
   $('#sSave').onclick = async () => {
-    settings.key = $('#sKey').value.trim(); settings.region = $('#sRegion').value; settings.poolSize = +$('#sPool').value;
-    if (!settings.key) { toast('Enter a key'); return; }
+    const newKey = cleanKey($('#sKey').value);
+    if (!newKey && !shared) { toast('Enter a key'); return; }
+    const oldKey = settings.key, btn = $('#sSave');
+    settings.key = newKey; btn.disabled = true; btn.textContent = 'Checking key…';
+    tmdb.checking = true; tmdb.ownBad = false;
+    try { await tmdb('/configuration'); }
+    catch (e) {
+      settings.key = oldKey; btn.disabled = false; btn.textContent = 'Save & play';
+      const bad = /401/.test(e.message);
+      const err = $('#sErr'); err.hidden = false;
+      err.textContent = bad ? 'TMDB says that key is wrong. Copy the "API Key" or "API Read Access Token" again from themoviedb.org/settings/api.' : 'Could not reach TMDB: ' + e.message;
+      return;
+    } finally { tmdb.checking = false; }
+    $('#sKey').value = newKey;
+    settings.region = $('#sRegion').value; settings.poolSize = +$('#sPool').value;
     LS.set('rc:settings', settings); closeModal();
     if (first) { try { await startDaily(dateKey(new Date())); } catch (e) { setStatus(e.message); } }
     else showHome();
@@ -520,7 +550,7 @@ function openHelp() {
 function openModal(html) { $('#mbody').innerHTML = html; $('#modal').hidden = false; }
 function closeModal() { $('#modal').hidden = true; }
 $('#mclose').onclick = closeModal;
-$('#modal').onclick = e => { if (e.target.id === 'modal' && settings.key) closeModal(); };
+$('#modal').onclick = e => { if (e.target.id === 'modal' && hasKey()) closeModal(); };
 
 function setNav(id) { document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.id === id)); }
 $('#bHome').onclick = showHome;
@@ -543,7 +573,7 @@ function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.re
 function renderHome() {
   const today = dateKey(new Date()), g = LS.get('rc:g:' + today, null);
   let status, icon = '🎬', label;
-  if (!settings.key) { status = '<b>Quick setup needed</b><div class="d">Add a free TMDB key to start playing</div>'; icon = '🔑'; label = 'Set up & play'; }
+  if (!hasKey()) { status = '<b>Quick setup needed</b><div class="d">Add a free TMDB key to start playing</div>'; icon = '🔑'; label = 'Set up & play'; }
   else if (!g || !g.guesses.length) { status = `<b>Today's movie is waiting</b><div class="d">${niceDate(today)} · not played yet</div>`; label = "Play today's movie"; }
   else if (!g.done) { status = `<b>In progress · ${g.guesses.length}/10 guesses</b><div class="d">${niceDate(today)}</div>`; icon = '⏳'; label = 'Continue today'; }
   else { status = `<b>${g.won ? `Solved in ${g.guesses.length}` : 'Missed today'}</b><div class="d">${niceDate(today)} · come back tomorrow</div>`; icon = g.won ? '✅' : '❌'; label = "See today's result"; }
@@ -551,13 +581,14 @@ function renderHome() {
   $('#hDaily').textContent = label;
   $('#hStatsRow').innerHTML = statsRow();
 }
-const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
-$('#hDaily').onclick = needKey(() => startDaily(dateKey(new Date())).catch(e => setStatus(e.message)));
-$('#hUnl').onclick = needKey(() => startUnlimited(false).catch(e => setStatus(e.message)));
+const needKey = fn => () => { if (!hasKey()) { openSettings(true); return; } fn(); };
+const keyFail = e => { setStatus(e.message); if (!hasKey()) { showHome(); openSettings(true); } };
+$('#hDaily').onclick = needKey(() => startDaily(dateKey(new Date())).catch(keyFail));
+$('#hUnl').onclick = needKey(() => startUnlimited(false).catch(keyFail));
 $('#hRewatch').onclick = needKey(openRewatch);
 $('#hHow').onclick = openHelp;
 $('#hStats').onclick = openStats;
-$('#hSet').onclick = () => openSettings(!settings.key);
+$('#hSet').onclick = () => openSettings(!hasKey());
 
 // ---------- search ----------
 let sTimer = null, sel = -1, results = [], sToken = 0;
