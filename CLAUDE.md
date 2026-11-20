@@ -47,6 +47,7 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 ## Cost guardrails (keep these)
 - Google Street View: 5,000 free loads/month. Each Geo Clue round = 1 load per player. Every load bumps a shared counter (`/api/usage`), shown as a meter on the Geo Clue home screen and in ⚙. The game stops when the shared count reaches the ⚙ limit (default 4,000); if the counter is unreachable it falls back to this browser's own count. Finding locations uses Street View *metadata* (free).
 - Google Maps is only loaded when a Geo Clue game starts (not on its home screen).
+- Geo Clue skips short isolated roads: `notIsolated()` looks for coverage 5 km away in 12 directions (metadata, free) and needs 2+ hits. If every try fails, it keeps the first spot found.
 - Upstash free plan: 500K commands/month. The usage counter adds ~1 command per Street View load and per home/settings view. Live rooms poll every 2s; a 4-player game uses roughly 2,500 commands.
 
 ## Geo Clue sound

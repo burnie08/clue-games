@@ -454,8 +454,24 @@ function initMap() {
 
 // ---------- finding locations (metadata lookups are free) ----------
 function weightedPick(list, rng) { const tot = list.reduce((a, r) => a + r[5], 0); let x = rng() * tot; for (const r of list) { x -= r[5]; if (x <= 0) return r; } return list[list.length - 1]; }
+// Skip short isolated roads (a lone 2-mile trail, a tiny island road): look for other Street View
+// 3.5–6.5 km away in 12 directions. A real road leaves the circle at least twice; a short isolated
+// road never reaches it. Metadata only, so free; all 12 lookups run at once.
+const RING_KM = 5, RING_N = 12, RING_R = 1500, RING_MIN = 2;
+async function notIsolated(lat, lng) {
+  const reqs = [];
+  for (let k = 0; k < RING_N; k++) {
+    const a = k / RING_N * 2 * Math.PI;
+    const p = { lat: lat + RING_KM / 111.32 * Math.cos(a), lng: lng + RING_KM / (111.32 * Math.max(0.2, Math.cos(lat * Math.PI / 180))) * Math.sin(a) };
+    const req = { location: p, radius: RING_R, preference: 'nearest' };
+    if (G.StreetViewSource && G.StreetViewSource.GOOGLE) req.sources = [G.StreetViewSource.GOOGLE]; else req.source = 'outdoor';
+    reqs.push(sv.getPanorama(req).then(({ data }) => !!(data && data.location && data.location.pano), () => false));
+  }
+  return (await Promise.all(reqs)).filter(Boolean).length >= RING_MIN;
+}
 async function findLocation(rng, pack) {
   const P = PACKS[pack];
+  let fallback = null;   // first spot found, used only if every try is an isolated road
   for (let i = 0; i < (P.shape ? 60 : 30); i++) {
     const r = weightedPick(P.regions, rng);
     const location = { lat: r[1] + rng() * (r[2] - r[1]), lng: r[3] + rng() * (r[4] - r[3]) };
@@ -465,10 +481,13 @@ async function findLocation(rng, pack) {
     try {
       const { data } = await sv.getPanorama(req);
       if (data && data.location && data.location.pano && (!P.shape || inShape(P.shape, data.location.latLng.lat(), data.location.latLng.lng()))) {
-        return { pano: data.location.pano, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(), desc: data.location.description || '', region: r[0], heading: Math.round(rng() * 360), guess: null, km: null, pts: null };
+        const spot = { pano: data.location.pano, lat: data.location.latLng.lat(), lng: data.location.latLng.lng(), desc: data.location.description || '', region: r[0], heading: Math.round(rng() * 360), guess: null, km: null, pts: null };
+        if (await notIsolated(spot.lat, spot.lng)) return spot;
+        if (!fallback) fallback = spot;
       }
     } catch (e) { /* no coverage near this point — try another */ }
   }
+  if (fallback) return fallback;
   throw new Error('Could not find Street View coverage. Try again.');
 }
 
