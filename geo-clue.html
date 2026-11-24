@@ -559,7 +559,9 @@ function resume() {
 function total() { return game.rounds.reduce((a, r) => a + (r.pts || 0), 0); }
 function hud() {
   $('#hRound').innerHTML = `Round <b>${Math.min(game.idx + 1, ROUNDS)}</b><small>/${ROUNDS}</small>`;
-  $('#hScore').innerHTML = `${total().toLocaleString()} <small>pts</small>`;
+  // live rooms: keep this round's points hidden until the round is revealed for everyone
+  const shown = game.mode === 'live' && game.phase !== 'result' ? total() - ((game.rounds[game.idx] || {}).pts || 0) : total();
+  $('#hScore').innerHTML = `${shown.toLocaleString()} <small>pts</small>`;
   $('#hMode').innerHTML = modeLabel();
 }
 function clearResultLayers() { resultLayers.forEach(l => l.setMap(null)); resultLayers = []; }

@@ -52,13 +52,13 @@ global.__panoLocs={};
  console.log('      started: host phase',A.w.__t.g().phase,'guest phase',B.w.__t.g().phase,'| same pano:',A.w.__t.g().rounds[0].pano===B.w.__t.g().rounds[0].pano,'| HUD:',B.d.querySelector('#hMode').textContent);
  for(let r=0;r<5;r++){
    A.guess(0.5);await sleep(30);
-   console.log(`      R${r+1} host after guessing: ${A.panel().slice(0,60)}`);
+   console.log(`      R${r+1} host after guessing: ${A.panel().slice(0,60)} | top score while waiting: ${A.d.querySelector('#hScore').textContent} (round pts ${A.w.__t.g().rounds[r].pts})`);
    if(r===3){ // Sam AFK this round -> host ends round
      A.d.querySelector('#endRoundBtn').click();await sleep(40);await B.poll();
      console.log(`      R${r+1} host forced end; guest sees: ${B.panel().slice(0,90)}`);
    } else { B.guess(r%2?3:1);await sleep(40);await A.poll(); }
    await B.poll();
-   console.log(`      R${r+1} result host: ${A.panel().slice(0,120)}…`);
+   console.log(`      R${r+1} result host: ${A.panel().slice(0,120)}… | top score after reveal: ${A.d.querySelector('#hScore').textContent}`);
    console.log(`      R${r+1} guest sees host-only button? ${!!B.d.querySelector('#liveNext')} | waiting text: ${B.panel().includes('Waiting for the host')}`);
    A.d.querySelector('#liveNext').click();await sleep(40);await B.poll();await A.poll();
  }
