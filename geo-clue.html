@@ -71,6 +71,14 @@ nav button.on{background:var(--accent);color:#1a1300}
 .usage .bar{margin:6px 0 2px}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#1a1300;padding:8px 14px;border-radius:8px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
 #toast.show{opacity:1}
+#chat{position:fixed;left:12px;bottom:24px;z-index:45;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+#chat[hidden],#chatPanel[hidden],#chatBadge[hidden]{display:none}
+#chatBtn{background:#000c;padding:8px 12px;box-shadow:0 4px 16px #0008}
+#chatBadge{background:#ff4d4d;color:#fff;border-radius:9px;padding:0 6px;margin-left:4px;font-size:12px}
+#chatPanel{width:min(320px,86vw);background:var(--panel);border-radius:12px;padding:8px;box-shadow:0 10px 40px #000a;display:flex;flex-direction:column;gap:6px}
+#chatList{max-height:240px;min-height:60px;overflow:auto;font-size:13px;line-height:1.4;display:flex;flex-direction:column;gap:3px;text-align:left;overflow-wrap:anywhere}
+#chatList .empty{color:var(--muted)}
+#chatForm{display:flex;gap:6px}#chatForm input{flex:1;min-width:0;padding:7px 9px}
 @media (max-width:700px){
   #mapBox{display:none;left:0;right:0;bottom:0;width:auto;height:65%;padding:8px;background:var(--bg);opacity:1}
   #mapBox:hover{width:auto;height:65%}
@@ -78,6 +86,7 @@ nav button.on{background:var(--accent);color:#1a1300}
   #mapBox.result{display:flex;height:auto;padding:0}
   #mapToggle{display:block}
   #mapPin{display:none}
+  #chat{bottom:auto;top:96px}
   #resPanel{bottom:10px;min-width:0;width:92vw}
 }
 
@@ -147,6 +156,13 @@ nav button.on{background:var(--accent);color:#1a1300}
 </div>
 <div id="modal" hidden><div class="mbox"><button class="close" id="mclose">×</button><div id="mbody"></div></div></div>
 <div id="toast"></div>
+<div id="chat" hidden>
+  <div id="chatPanel" hidden>
+    <div id="chatList"></div>
+    <form id="chatForm"><input id="chatIn" maxlength="200" placeholder="Say something…" autocomplete="off"><button class="primary">Send</button></form>
+  </div>
+  <button id="chatBtn">💬 Chat<span id="chatBadge" hidden></span></button>
+</div>
 <section id="home" class="screen"><div class="hwrap">
   <div class="hicon">🌍</div>
   <div class="hlogo">Geo<span>Clue</span></div>
@@ -982,14 +998,42 @@ function enterRoom(code) {
   live = { code, round: -1, data: null, errs: 0, skew: 0, busy: false, resultSig: '', finalShown: false };
   pendingRoom = null;
   try { history.replaceState(null, '', location.pathname + '?room=' + code); } catch (e) {}
+  $('#chat').hidden = false; $('#chatPanel').hidden = true; $('#chatList').innerHTML = ''; $('#chatBadge').hidden = true;
   hideMsg(); pollRoom();
   clearInterval(pollId); pollId = setInterval(pollRoom, 2000);
 }
 function leaveRoom() {
-  clearInterval(pollId); pollId = null; live = null;
+  clearInterval(pollId); clearTimeout(live && live.stopId); pollId = null; live = null;
+  $('#chat').hidden = true; $('#chatPanel').hidden = true;
   $('#lobby').classList.remove('on');
   try { history.replaceState(null, '', location.pathname); } catch (e) {}
 }
+// ---------- live room chat ----------
+function drawChat(d) {
+  const msgs = d.chat || [], last = msgs.length ? msgs[msgs.length - 1].ts : 0, sig = msgs.length + ':' + last;
+  if (live.chatSig !== sig) {
+    live.chatSig = sig;
+    const ids = Object.keys(d.players), col = id => { const i = ids.indexOf(id); return i < 0 ? 'var(--muted)' : COLORS[i % COLORS.length]; };
+    const list = $('#chatList'), atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 30;
+    list.innerHTML = msgs.slice(-60).map(m => `<div><b style="color:${col(m.id)}">${esc(m.n)}${m.id === sessId() ? ' (you)' : ''}:</b> ${esc(m.t)}</div>`).join('')
+      || '<div class="empty">No messages yet. Say hi!</div>';
+    if (atBottom || live.chatSeen == null) list.scrollTop = list.scrollHeight;
+  }
+  if (!$('#chatPanel').hidden || live.chatSeen == null) live.chatSeen = last;
+  const unread = msgs.filter(m => m.ts > live.chatSeen && m.id !== sessId()).length;
+  $('#chatBadge').hidden = !unread; $('#chatBadge').textContent = unread > 9 ? '9+' : unread;
+}
+$('#chatBtn').onclick = () => {
+  const p = $('#chatPanel'); p.hidden = !p.hidden;
+  if (!p.hidden) { if (live && live.data) { live.chatSeen = null; drawChat(live.data); } $('#chatList').scrollTop = $('#chatList').scrollHeight; $('#chatIn').focus(); }
+};
+$('#chatForm').onsubmit = async e => {
+  e.preventDefault();
+  const inp = $('#chatIn'), text = inp.value.trim();
+  if (!text || !live || !live.code) return;
+  inp.value = '';
+  try { await api('chat', { text }); pollRoom(); } catch (err) { inp.value = text; apiError(err); }
+};
 const isHost = () => live && live.data && live.data.room.hostId === sessId();
 function roundOver(d) {
   const room = d.room, r = room.round, ids = Object.keys(d.players);
@@ -1016,11 +1060,16 @@ async function pollRoom() {
   live.data = d; live.skew = d.now - Date.now();
   const room = d.room;
   if (otherGame(room, room.code)) { clearInterval(pollId); return; }
+  drawChat(d);
   if (room.state === 'lobby') return renderLobby(d);
   $('#lobby').classList.remove('on');
   if (!game || game.mode !== 'live' || game.code !== room.code) setupLiveGame(room);
   syncMine(d);
-  if (room.state === 'final') { clearInterval(pollId); return showLiveFinal(d); }
+  if (room.state === 'final') {
+    // keep checking slowly so the chat still works on the final screen, then stop after 15 minutes
+    if (!live.slow) { live.slow = true; clearInterval(pollId); pollId = setInterval(pollRoom, 5000); live.stopId = setTimeout(() => clearInterval(pollId), 15 * 60000); }
+    return showLiveFinal(d);
+  }
   const r = room.round;
   if (live.round !== r) { live.round = r; live.resultSig = ''; game.idx = r; game.phase = d.guesses[r + ':' + sessId()] ? 'wait' : 'play'; showRound(); }
   if (roundOver(d)) { game.phase = 'result'; showLiveResult(d); }

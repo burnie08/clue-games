@@ -5,12 +5,14 @@
 // Keys:  gc:room:CODE    → room JSON {code, hostId, settings, rounds, state, round, startedAt, forceEnd}
 //        gc:room:CODE:p  → hash  playerId → {"name": "..."}
 //        gc:room:CODE:g  → hash  "round:playerId" → {"lat","lng","km","pts","pick"}
+//        gc:room:CODE:c  → hash  "time:playerId" → {"id","n","t","ts"}  (chat, max MAX_CHAT messages per room)
 
 const DB_URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const DB_TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const TTL = 6 * 3600;
 const MAX_PLAYERS = 10;
 const ROUNDS = 5;
+const MAX_CHAT = 200;
 const GAMES = ['geo', 'ntt', 'hh'];
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -28,8 +30,9 @@ const clean = (s, n) => String(s || '').replace(/[<>]/g, '').trim().slice(0, n);
 
 async function load(code) {
   const K = 'gc:room:' + code;
-  const [room, players, guesses] = await redis([['GET', K], ['HGETALL', K + ':p'], ['HGETALL', K + ':g']]);
-  return { room: room ? JSON.parse(room) : null, players: hashToObj(players), guesses: hashToObj(guesses) };
+  const [room, players, guesses, chat] = await redis([['GET', K], ['HGETALL', K + ':p'], ['HGETALL', K + ':g'], ['HGETALL', K + ':c']]);
+  return { room: room ? JSON.parse(room) : null, players: hashToObj(players), guesses: hashToObj(guesses),
+    chat: Object.values(hashToObj(chat)).sort((a, b) => a.ts - b.ts) };
 }
 const saveRoom = room => redis([['SET', 'gc:room:' + room.code, JSON.stringify(room), 'EX', TTL]]);
 
@@ -95,6 +98,18 @@ module.exports = async (req, res) => {
         lat: body.lat == null ? null : +body.lat, lng: body.lng == null ? null : +body.lng,
         pick: body.pick == null ? null : clean(body.pick, 40) };
       await redis([['HSETNX', K + ':g', round + ':' + id, JSON.stringify(g)], ['EXPIRE', K + ':g', TTL]]);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'chat') {
+      if (!data.players[id]) return fail(403, 'Not in this room');
+      const text = String(body.text || '').replace(/[\x00-\x1f\x7f]/g, ' ').trim().slice(0, 200);   // the page escapes it when showing
+      if (!text) return fail(400, 'Empty message');
+      if (data.chat.length >= MAX_CHAT) return fail(409, 'Chat is full for this room');
+      const now = Date.now(), mine = data.chat.filter(m => m.id === id);
+      if (mine.length && now - mine[mine.length - 1].ts < 1000) return fail(429, 'Slow down a little');
+      const msg = { id, n: data.players[id].name, t: text, ts: now };
+      await redis([['HSET', K + ':c', now.toString(36) + ':' + id, JSON.stringify(msg)], ['EXPIRE', K + ':c', TTL]]);
       return res.status(200).json({ ok: true });
     }
 

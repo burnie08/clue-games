@@ -28,8 +28,11 @@ nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
 #timer.low{color:#ff6b6b}
 #tools{position:absolute;top:10px;right:10px;z-index:6;display:flex;gap:6px}
 #tools button{background:#000b;padding:8px 10px}
-#mapBox{position:absolute;right:12px;bottom:24px;width:320px;height:240px;z-index:7;display:flex;flex-direction:column;gap:6px;transition:width .15s,height .15s;opacity:.85}
-#mapBox:hover{width:min(620px,60vw);height:min(440px,60vh);opacity:1}
+#mapBox{position:absolute;right:12px;bottom:24px;width:420px;height:310px;z-index:7;display:flex;flex-direction:column;gap:6px;transition:width .15s,height .15s;opacity:.85}
+#mapBox:hover,#mapBox.pinned{width:min(960px,72vw);height:min(680px,74vh);opacity:1}
+#mapPin{position:absolute;top:8px;right:8px;z-index:1;background:#000b;padding:4px 9px;font-size:15px}
+#mapBox.pinned #mapPin{background:var(--accent);color:#1a1300}
+#mapBox.result #mapPin{display:none}
 #map{flex:1;border-radius:10px;overflow:hidden;border:2px solid #000}
 #guessBtn{width:100%}
 #mapToggle{display:none;position:absolute;right:12px;bottom:24px;z-index:7}
@@ -70,6 +73,7 @@ nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
   #mapBox.open{display:flex}
   #mapBox.result{display:flex;height:auto;padding:0}
   #mapToggle{display:block}
+  #mapPin{display:none}
   #resPanel{bottom:10px;min-width:0;width:92vw}
 }
 
@@ -124,6 +128,7 @@ nav{display:flex;gap:6px;flex-wrap:wrap}nav button{padding:8px 12px}
   <div id="tools"><button id="backBtn" title="Return to start">⟲ Start</button></div>
   <button id="mapToggle" class="primary">🗺 Map</button>
   <div id="mapBox">
+    <button id="mapPin" title="Keep the map big">⤢</button>
     <div id="map"></div>
     <button id="guessBtn" class="primary" disabled>Place a pin on the map</button>
   </div>
@@ -497,7 +502,7 @@ function showRound() {
   const r = game.rounds[game.idx];
   hud(); clearResultLayers();
   $('#resPanel').classList.remove('on');
-  $('#mapBox').classList.remove('result', 'open');
+  $('#mapBox').classList.remove('result', 'open'); $('#mapBox').classList.toggle('pinned', LS.get('hh:mapBig', false) === true);
   if (guessMarker) guessMarker.setMap(null);
   $('#guessBtn').disabled = true; $('#guessBtn').textContent = 'Place a pin on the map';
   map.setCenter(START); map.setZoom(START_ZOOM);
@@ -613,6 +618,7 @@ async function copy(t) {
 // ---------- buttons ----------
 $('#guessBtn').onclick = () => makeGuess(false);
 $('#mapToggle').onclick = () => $('#mapBox').classList.toggle('open');
+$('#mapPin').onclick = e => { e.stopPropagation(); LS.set('hh:mapBig', $('#mapBox').classList.toggle('pinned')); };
 $('#backBtn').onclick = () => { if (game && game.phase === 'play') { const r = game.rounds[game.idx]; pano.setPano(r.pano); pano.setPov({ heading: r.heading, pitch: 0 }); pano.setZoom(0); } };
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || homeOn() || $('#endS').classList.contains('on') || !$('#modal').hidden) return;

@@ -59,8 +59,9 @@ GitHub: `burnie08/clue-games` (branch `main`). **Vercel auto-deploys every push 
 
 ## Geo Clue multiplayer
 - **Challenge links**: `geo-clue.html?c=<base64url JSON>`. Format v1: `{v:1, p:pack, m:move, t:timer, r:[[panoId, heading, region]×5], s:[[name, [pts×5]], …]}`. Locations are re-read from Street View metadata by pano ID.
-- **Live rooms**: `geo-clue.html?room=CODE`. `/api/room` actions: `create`, `join`, `get`, `start`, `guess`, `next`, `endround`, `settings`. Host-only: start/next/endround/settings. `join` takes the page's `game`; if the room is for another game it answers `{ok:false, game}` without adding the player, and the page redirects there (no ghost players). Rooms expire after 6h, max 10 players. Each browser *tab* is one player (`sessionStorage` id).
-- Redis keys: `gc:room:CODE` (room JSON), `gc:room:CODE:p` (players hash), `gc:room:CODE:g` (guesses hash, field `round:playerId`).
+- **Live rooms**: `geo-clue.html?room=CODE`. `/api/room` actions: `create`, `join`, `get`, `start`, `guess`, `next`, `endround`, `settings`, `chat`. Host-only: start/next/endround/settings. `join` takes the page's `game`; if the room is for another game it answers `{ok:false, game}` without adding the player, and the page redirects there (no ghost players). Rooms expire after 6h, max 10 players. Each browser *tab* is one player (`sessionStorage` id).
+- Redis keys: `gc:room:CODE` (room JSON), `gc:room:CODE:p` (players hash), `gc:room:CODE:g` (guesses hash, field `round:playerId`), `gc:room:CODE:c` (chat hash, field `time:playerId`, max 200 per room, 1 message/second per player).
+- **Chat** (Geo Clue only for now): 💬 button bottom-left in lobby, game and final screen. `get` returns `chat` sorted by time. After the game ends the page keeps checking every 5s for 15 min so chat still works.
 
 ## Name That Team / Hometown Heroes multiplayer
 - Same live-room API as Geo Clue. New room fields: `settings.game` (`'geo'|'ntt'|'hh'`), `settings.hard`, `rounds[i].ans` (the right answer), and guess `pick` (the chosen team). A page redirects a room or challenge that belongs to another game.
@@ -78,6 +79,7 @@ node smoke-room-games.js    # room API with game/hard/ans/pick, Geo Clue redirec
 node smoke-ntt.js           # Name That Team solo
 node smoke-ntt-multi.js     # Name That Team challenge + live room
 node smoke-hh.js            # Hometown Heroes
+node smoke-chat.js          # Geo Clue live room chat
 ```
 These print what happened at each step. Read the output and check it makes sense. They fake TMDB/iTunes/Google/Redis, so they test the game logic, not the real services. After changing a game, also run a quick syntax check of its script.
 
