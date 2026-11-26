@@ -268,8 +268,8 @@ function hideMsg() { $('#msg').classList.remove('on'); }
 
 // ---------- settings & usage ----------
 let settings = Object.assign({ key: '', pack: 'world', move: 'move', timer: 0, units: 'mi', cap: 4000, livePack: 'world', liveMove: 'move', liveTimer: 120, music: true, sfx: true, mute: false }, LS.get('gc:settings', {}));
-const LIVE_TIMERS = [0, 30, 60, 90, 120, 180, 300];
-const timerName = t => !t ? 'No timer' : t % 60 ? t + 's' : (t / 60) + ' min';
+const LIVE_TIMERS = [0, 30, 60, 90, 120, 150, 180, 300];
+const timerName = t => !t ? 'No timer' : t < 60 ? t + 's' : t % 60 ? Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + ' min' : (t / 60) + ' min';
 // Optional: a key stored in Vercel (Settings → Environment Variables → GOOGLE_MAPS_KEY) is served by /api/config,
 // so every device works without pasting the key. A key typed into ⚙ Settings takes priority.
 let serverKey = '';

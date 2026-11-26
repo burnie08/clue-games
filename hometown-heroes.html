@@ -296,8 +296,8 @@ const SHARED_KEYS = ['key', 'cap', 'units', 'name'], OWN_KEYS = ['move', 'timer'
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => o && o[k] !== undefined).map(k => [k, o[k]]));
 let settings = Object.assign({ key: '', cap: 4000, units: 'mi', move: 'move', timer: 0, liveMove: 'move', liveTimer: 120 },
   pick(LS.get('gc:settings', {}), SHARED_KEYS), pick(LS.get('hh:settings', {}), OWN_KEYS));
-const LIVE_TIMERS = [0, 30, 60, 90, 120, 180, 300];
-const timerName = t => !t ? 'No timer' : t % 60 ? t + 's' : (t / 60) + ' min';
+const LIVE_TIMERS = [0, 30, 60, 90, 120, 150, 180, 300];
+const timerName = t => !t ? 'No timer' : t < 60 ? t + 's' : t % 60 ? Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + ' min' : (t / 60) + ' min';
 // Optional: a key stored in Vercel (GOOGLE_MAPS_KEY) is served by /api/config, so every device works without pasting it.
 let serverKey = '';
 function saveSettings() {
