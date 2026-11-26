@@ -33,7 +33,7 @@ function browser(name,opts={}){
  class O{constructor(o){this.o=o||{};this.ls={}}addListener(e,f){this.ls[e]=f}setMap(m){this.m=m}getMap(){return this.m}}
  class Marker extends O{constructor(o){super(o);this.m=o.map;this.p=o.position}setPosition(p){this.p=p}getPosition(){return new LL(this.p.lat,this.p.lng)}}
  class Map extends O{setCenter(){}setZoom(){}fitBounds(){}}
- class Pano extends O{constructor(e,o){super(o);st.panos++;this.pano=o.pano}setOptions(o){this.o=o;this.pano=o.pano}getPano(){return this.pano}setPano(p){this.pano=p}setPov(){}setZoom(){}}
+ class Pano extends O{constructor(e,o){super(o);st.panos++;this.pano=o.pano}setOptions(o){this.o=o;this.pano=o.pano;this.pov=null}getPano(){return this.pano}setPano(p){this.pano=p}getPov(){return Object.assign({},this.pov||this.o.pov)}setPov(p){this.pov=Object.assign({},p);if(this.ls.pov_changed)this.ls.pov_changed()}turn(h){this.pov={heading:h,pitch:0};if(this.ls.pov_changed)this.ls.pov_changed()}setZoom(){}}
  class SVS{async getPanorama(r){
   if(r.pano){const l=panoLocs[r.pano];if(!l)throw new Error('ZERO_RESULTS');return{data:{location:{pano:r.pano,latLng:new LL(l.lat,l.lng),description:'X'}}}}
   const id='P'+(++panoN);panoLocs[id]={lat:r.location.lat,lng:r.location.lng};return{data:{location:{pano:id,latLng:new LL(r.location.lat,r.location.lng),description:'X'}}}}}
@@ -42,7 +42,7 @@ function browser(name,opts={}){
   if(u.includes('api/usage')){if(o&&o.method==='POST')st.posts++;return{ok:false,status:503,json:async()=>({error:'nodb'})};}
   if(u.includes('api/config'))return{ok:true,status:200,json:async()=>({googleMapsKey:''})};
   const {status,j}=await callApi(JSON.parse(o.body));return{ok:status<300,status,json:async()=>j};};
- w.eval(src+';window.__t={pc:()=>pendingChal,g:()=>game,TEAM,distKm,poll:pollRoom,live:()=>live,b64d,pano:()=>pano,selectTeam,makeGuess};');
+ w.eval(src+';window.__t={pc:()=>pendingChal,g:()=>game,TEAM,distKm,bearing,nearestTeam,poll:pollRoom,live:()=>live,b64d,pano:()=>pano,selectTeam,makeGuess};');
  const d=w.document;
  return {w,d,st,
   async ready(){await sleep(20);if(w.__gcReady)await w.__gcReady();await sleep(80);},
@@ -62,7 +62,7 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   const totA=gA.rounds.reduce((a,r)=>a+r.pts,0);
   const link=linkOf(A);const ch=A.w.__t.b64d(new URL(link).searchParams.get('c'));
   console.log('      Andrew scored',totA,'| link',link.slice(0,70)+'…','| r[0]',JSON.stringify(ch.r[0]));
-  check('challenge link: ntt format (v, g, h, m, t, r=[pano, heading, ans]x5, s)',link.includes('name-that-team.html?c=')&&ch.v===1&&ch.g==='ntt'&&ch.h===0&&ch.m===gA.move&&ch.t===gA.timer&&ch.r.length===5&&ch.r.every((x,i)=>x[0]===gA.rounds[i].pano&&x[2]===gA.rounds[i].ans)&&ch.s[0][0]==='Andrew'&&ch.s[0][1].join()==='5000,5000,5000,0,0');
+  check('challenge link: ntt format (v, g, h, m, t, r=[pano, heading, ans]x5, s)',link.includes('name-that-team.html?c=')&&ch.v===1&&ch.g==='ntt'&&ch.h===0&&ch.m==='nomove'&&gA.move==='nomove'&&ch.t===gA.timer&&ch.r.length===5&&ch.r.every((x,i)=>x[0]===gA.rounds[i].pano&&x[2]===gA.rounds[i].ans)&&ch.s[0][0]==='Andrew'&&ch.s[0][1].join()==='5000,5000,5000,0,0');
   const B=browser('Sam',{url:link});await sleep(30);
   const banner=txt(B.d.querySelector('#chalBanner'));console.log('      Sam home banner:',banner);
   check('challenge banner on home names the challenger',on(B.d,'#home')&&banner.includes('Andrew')&&!!B.d.querySelector('#hChal'));
@@ -84,11 +84,12 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   H.d.querySelector('#hUnl').click();await H.ready();
   const gH=H.w.__t.g();for(let i=0;i<5;i++){H.choose(gH.rounds[i].ans);H.d.querySelector('#nextBtn').click();}
   const link=linkOf(H),ch=H.w.__t.b64d(new URL(link).searchParams.get('c'));
-  const B=browser('Sam',{url:link,nt:{hard:false,move:'move',timer:0}});await sleep(30);
+  const B=browser('Sam',{url:link,nt:{hard:false,timer:0}});await sleep(30);
   console.log('      hard banner:',txt(B.d.querySelector('#chalBanner')));
   B.d.querySelector('#hChal').click();await B.ready();
   const g=B.w.__t.g(),po=B.w.__t.pano().o;
-  check('hard challenge stays hard: h=1, game.hard, NMPZ, 25s timer, view locked',ch.h===1&&g.hard===true&&g.move==='nmpz'&&g.timer===25&&B.d.querySelector('#timer').textContent==='⏱ 25s'&&on(B.d,'#block')&&po.clickToGo===false);
+  const farH=Math.max(...g.rounds.map(r=>B.w.__t.distKm(r,B.w.__t.TEAM[r.ans])));
+  check('hard challenge stays hard: h=1, game.hard, 25s timer, free zoom, no walking, spots <= 4.9 km',ch.h===1&&ch.m==='nomove'&&g.hard===true&&g.near===false&&g.move==='nomove'&&g.timer===25&&B.d.querySelector('#timer').textContent==='⏱ 25s'&&!on(B.d,'#block')&&po.clickToGo===false&&po.linksControl===false&&po.zoom===0&&po.zoomControl===true&&farH<=4.9);
   B.w.__t.selectTeam(g.rounds[0].ans);B.w.__t.makeGuess(true);
   check('hard challenge: timeout scores 0',g.rounds[0].pts===0);}
 
@@ -100,10 +101,14 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   check('live room created as game ntt with an answer per round',on(A.d,'#lobby')&&room.settings.game==='ntt'&&room.settings.hard===false&&room.rounds.length===5&&room.rounds.every(r=>A.w.__t.TEAM[r.ans]));
   B.d.querySelector('#hCode').value=code.toLowerCase();B.d.querySelector('#hJoin').click();await sleep(50);await B.ready();await sleep(50);
   await A.poll();
-  check('both players in the lobby, guest waits for host',txt(A.d.querySelector('#lobbyBody')).includes('Sam')&&!!A.d.querySelector('#lbStart')&&!B.d.querySelector('#lbStart')&&!!A.d.querySelector('#lbMove'));
+  check('both players in the lobby, guest waits for host',txt(A.d.querySelector('#lobbyBody')).includes('Sam')&&!!A.d.querySelector('#lbStart')&&!B.d.querySelector('#lbStart')&&!!A.d.querySelector('#lbTimer')&&!A.d.querySelector('#lbMove'));
   A.d.querySelector('#lbStart').click();await sleep(50);await B.poll();
   const gA=A.w.__t.g(),gB=B.w.__t.g();
   check('live started: same panos, both playing, picker shown',gA.mode==='live'&&gB.mode==='live'&&gA.rounds[0].pano===gB.rounds[0].pano&&gA.phase==='play'&&gB.phase==='play'&&!B.d.querySelector('#picker').hidden);
+  {const T=B.w.__t.TEAM,far=Math.max(...gB.rounds.map(r=>B.w.__t.distKm(r,T[r.ans]))),P=B.w.__t.pano(),po=P.o,toA=B.w.__t.bearing(gB.rounds[0],T[gB.rounds[0].ans]);
+   P.turn(toA);const dd=Math.abs(P.getPov().heading-toA)%360,off=dd>180?360-dd:dd;
+   console.log('      easy room furthest spot',(far*1000).toFixed(0),'m | turn at arena ->',off.toFixed(1),'deg off');
+   check('live easy room: easy spots (<= 0.3 km), near, zoom 1 locked, no walking, turn clamped',far<=0.3&&gB.hard===false&&gB.near===true&&po.zoom===1&&po.zoomControl===false&&po.linksControl===false&&po.clickToGo===false&&!on(B.d,'#block')&&Math.abs(off-100)<1e-6);}
   let resOk=true,pickOk=true;
   for(let r=0;r<5;r++){
    const ans=gA.rounds[r].ans,wr=B.wrong(ans);
@@ -128,19 +133,20 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   check('every live round bumped the shared counter (5 each)',A.st.posts===5&&B.st.posts===5);}
 
  // ===== room created with hard on =====
- {const A=browser('Andrew',{nt:{liveHard:true,liveMove:'move',liveTimer:120}}),B=browser('Sam');await sleep(30);
-  check('home: live hard toggle hides live move/timer',A.d.querySelector('#lHard').checked&&A.d.querySelector('#lOpts').hidden);
+ {const A=browser('Andrew',{nt:{liveHard:true,liveTimer:120}}),B=browser('Sam');await sleep(30);
+  check('home: live hard toggle hides live timer, no live move dropdown',A.d.querySelector('#lHard').checked&&A.d.querySelector('#lOpts').hidden&&!A.d.querySelector('#lMove'));
   A.d.querySelector('#hCreate').click();await A.ready();await sleep(60);
   const code=txt(A.d.querySelector('.rcode')),room=roomOf(code),T=A.w.__t.TEAM;
   const far=Math.max(...room.rounds.map(r=>A.w.__t.distKm(r,T[r.ans])));
   console.log('      hard room settings',JSON.stringify(room.settings),'| furthest spot',(far*1000).toFixed(0),'m');
-  check('hard room: hard, NMPZ, 25s; rounds are hard spots (within 0.3 km of arena)',room.settings.hard===true&&room.settings.move==='nmpz'&&room.settings.timer===25&&far<=0.3);
+  check('hard room: hard, nomove, 25s; rounds are hard spots (<= 4.9 km, fair)',room.settings.hard===true&&room.settings.move==='nomove'&&room.settings.timer===25&&far<=4.9&&room.rounds.every(r=>A.w.__t.nearestTeam(r)===r.ans));
   B.d.querySelector('#hCode').value=code;B.d.querySelector('#hJoin').click();await sleep(50);await B.ready();await sleep(50);await A.poll();
   const lb=txt(B.d.querySelector('#lobbyBody'));console.log('      guest lobby:',lb.slice(0,160));
   check('guest sees hard label; host has no move/timer controls',/Hard/.test(lb)&&/25/.test(lb)&&!A.d.querySelector('#lbMove')&&!A.d.querySelector('#lbTimer')&&/Hard/.test(txt(A.d.querySelector('#lobbyBody'))));
   A.d.querySelector('#lbStart').click();await sleep(50);await B.poll();
   const g=B.w.__t.g();
-  check('hard live game: hard, NMPZ, 25s timer, view locked',g.hard===true&&g.move==='nmpz'&&g.timer===25&&on(B.d,'#block')&&/25s/.test(B.d.querySelector('#timer').textContent));
+  const hpo=B.w.__t.pano().o;
+  check('hard live game: hard, 25s timer, free zoom, no walking',g.hard===true&&g.near===false&&g.move==='nomove'&&g.timer===25&&!on(B.d,'#block')&&hpo.clickToGo===false&&hpo.linksControl===false&&hpo.zoom===0&&hpo.zoomControl===true&&/25s/.test(B.d.querySelector('#timer').textContent));
   B.w.__t.selectTeam(g.rounds[0].ans);B.w.__t.makeGuess(true);await sleep(40);
   const gs=db.get('gc:room:'+code+':g')||{},gb=JSON.parse(gs['0:'+B.w.sessionStorage.getItem('gc:sid')]||'null');
   check('hard live timeout sends pts 0, pick null',gb&&gb.pts===0&&gb.pick===null);}
@@ -172,10 +178,13 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   for(const s of [5,[null],[['a',5]],[['b',[1,2]]],'zz']){
    const M=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:R5,s})});await sleep(30);
    const mb=txt(M.d.querySelector('#chalBanner'));
-   if(!(on(M.d,'#home')&&txt(M.d.querySelector('#todayCard')).length&&mb.includes('You have a challenge')&&M.d.querySelector('#hMove').options.length===3))badS.push(JSON.stringify(s));
+   if(!(on(M.d,'#home')&&txt(M.d.querySelector('#todayCard')).length&&mb.includes('You have a challenge')&&!M.d.querySelector('#hMove')))badS.push(JSON.stringify(s));
   }
   const T5=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'constructor',t:99999,r:R5,s:[]})});await sleep(30);
-  check('ntt link: t clamped to 600, unknown move falls back to Moving',!!T5.w.__t.pc()&&T5.w.__t.pc().t===600&&T5.w.__t.pc().m==='move'&&/Moving/.test(txt(T5.d.querySelector('#chalBanner'))));
+  console.log('      clamped-link banner:',txt(T5.d.querySelector('#chalBanner')));
+  check('ntt link: t clamped to 600, any move becomes nomove (Easy label)',!!T5.w.__t.pc()&&T5.w.__t.pc().t===600&&T5.w.__t.pc().m==='nomove'&&/Easy/.test(txt(T5.d.querySelector('#chalBanner'))));
+  const T6=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:R5,s:[]})});await sleep(30);
+  check('ntt link with m "move" becomes nomove (no walking)',!!T6.w.__t.pc()&&T6.w.__t.pc().m==='nomove');
   for(const id of ['constructor','__proto__','toString']){
    const Y=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:[...R5.slice(0,4),['P5',0,id]],s:[]})});await sleep(30);
    check(`ntt link with team "${id}" is broken`,Y.w.__t.pc()===null&&txt(Y.d.querySelector('#chalBanner'))==='');}
@@ -186,7 +195,7 @@ const linkOf=B=>{B.d.querySelector('#chalBtn').click();return B.d.querySelector(
   const Z3=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:'move',t:0,r:[...R5.slice(0,4),['P5',0,['SEA']]],s:[]})});await sleep(30);
   check('ntt page: array team id ["SEA"] is a broken link',Z3.w.__went===undefined&&Z3.w.__t.pc()===null);
   const Z4=browser('Sam',{url:'https://clue-games.vercel.app/name-that-team.html?c='+b64({v:1,g:'ntt',h:0,m:['nmpz'],t:0,r:R5,s:[]})});await sleep(30);
-  check('ntt page: array move falls back to Moving',!!Z4.w.__t.pc()&&Z4.w.__t.pc().m==='move');
+  check('ntt page: array move becomes nomove',!!Z4.w.__t.pc()&&Z4.w.__t.pc().m==='nomove');
   check('malformed scores (5, [null], bad entries, string): home still renders, banner shown'+(badS.length?' — broke on '+badS.join(' '):''),!badS.length);}
 
  console.log(bad?`${bad} FAILED`:'ALL PASS');

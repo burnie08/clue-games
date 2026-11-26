@@ -142,23 +142,23 @@ nav button.on{background:var(--accent);color:#1a1300}
 <section id="home" class="screen"><div class="hwrap">
   <div class="hicon">🏒</div>
   <div class="hlogo">Name<span>ThatTeam</span></div>
-  <p class="tag">You're dropped on a street within about 10 miles of an NHL arena. Look around, then pick which of the 32 teams plays there. 5 rounds, 5,000 points for each right answer.</p>
+  <p class="tag">You're dropped on a street near an NHL rink. Look around (no walking), then pick which of the 32 teams plays there. 5 rounds, 5,000 points for each right answer.</p>
   <div id="chalBanner"></div>
   <div class="today" id="todayCard"></div>
   <div class="hbtns"><button class="primary" id="hDaily">Play today's 5 teams</button></div>
   <div class="opts">
     <div class="optsTitle">Unlimited</div>
-    <div class="grid2" id="hOpts"><select id="hMove" title="Movement"></select><select id="hTimer" title="Round timer"></select></div>
-    <label style="display:flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer"><input type="checkbox" id="hHard" style="width:auto"> <span><b>Hard mode</b> <span class="help">· right outside the arena, facing away, NMPZ, 25 s</span></span></label>
+    <div id="hOpts"><select id="hTimer" title="Round timer"></select></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:8px;cursor:pointer"><input type="checkbox" id="hHard" style="width:auto"> <span><b>Hard mode</b> <span class="help">· up to 3 miles from the rink, 25 s</span></span></label>
     <button id="hUnl" style="width:100%;margin-top:8px">Play Unlimited</button>
   </div>
   <div class="opts">
     <div class="optsTitle">⚔ Play with friends</div>
-    <div class="grid2" id="lOpts"><select id="lMove" title="Live room movement"></select><select id="lTimer" title="Live room round timer"></select></div>
-    <label style="display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer"><input type="checkbox" id="lHard" style="width:auto"> <span><b>Hard mode room</b> <span class="help">· NMPZ, 25 s</span></span></label>
+    <div id="lOpts"><select id="lTimer" title="Live room round timer"></select></div>
+    <label style="display:flex;gap:8px;align-items:center;margin:8px 0;cursor:pointer"><input type="checkbox" id="lHard" style="width:auto"> <span><b>Hard mode room</b> <span class="help">· up to 3 miles from the rink, 25 s</span></span></label>
     <button id="hCreate" class="primary" style="width:100%">Create a live room</button>
     <div style="display:flex;gap:6px;margin-top:8px"><input id="hCode" placeholder="Room code" maxlength="6" autocomplete="off"><button id="hJoin">Join</button></div>
-    <p class="help" style="margin:8px 0 0">Pick the live room's movement, timer and hard mode above. As host you can still change movement and timer in the lobby (not in a hard room). You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
+    <p class="help" style="margin:8px 0 0">Pick the live room's timer and hard mode above. As host you can still change the timer in the lobby (not in a hard room). You can also finish any game and tap <b>⚔ Challenge a friend</b> to send a link.</p>
   </div>
   <div id="hStatsRow"></div>
   <div class="tag" id="hUsage" style="font-size:12px;margin-bottom:6px"></div>
@@ -216,10 +216,15 @@ const TEAMS = [
 const TEAM = Object.fromEntries(TEAMS.map(t => [t.code, t]));
 const DIVS = ['Atlantic', 'Metropolitan', 'Central', 'Pacific'];
 const fullName = t => t.city + ' ' + t.name;
-const MOVES = { move: 'Moving', nomove: 'No move', nmpz: 'NMPZ' };
+// every game: look around (pan + zoom) but no walking.
+// Easy (normal) mode: right outside the arena, facing away, and you can turn but never toward it.
+// Hard mode (and Daily): anywhere up to 3 miles from the arena, free look. Hard also has a fixed 25 s timer.
+const MOVES = { nomove: 'Look around' }, MOVE = 'nomove';
+const AWAY_MIN_OFF = 100;   // easy mode: the view never points within 100° of the arena (covers a wide screen's view plus the building)
 const ROUNDS = 5;
-const SPOT_KM = 16;   // ~10 miles around the arena
-const HARD_START_KM = 0.25, HARD_MAX_KM = 0.3, HARD_TIMER = 25;   // hard mode: right outside the arena, facing away
+const SPOT_KM = 4.8;   // hard mode + Daily: ~3 miles around the arena
+const NEAR_START_KM = 0.25, NEAR_MAX_KM = 0.3;   // easy mode: right outside the arena, facing away
+const HARD_TIMER = 25;
 
 // ---------- helpers ----------
 const $ = s => document.querySelector(s);
@@ -264,9 +269,9 @@ function hideMsg() { $('#msg').classList.remove('on'); }
 // ---------- settings & usage ----------
 // Google key, Street View limit and units are shared with Geo Clue (gc:settings), so they're only entered once.
 // Your name is shared too (challenges and live rooms). Name That Team's own choices (movement, timer, hard, live room) live in nt:settings.
-const SHARED_KEYS = ['key', 'cap', 'units', 'name'], OWN_KEYS = ['move', 'timer', 'hard', 'liveMove', 'liveTimer', 'liveHard'];
+const SHARED_KEYS = ['key', 'cap', 'units', 'name'], OWN_KEYS = ['timer', 'hard', 'liveTimer', 'liveHard'];
 const pick = (o, keys) => Object.fromEntries(keys.filter(k => o && o[k] !== undefined).map(k => [k, o[k]]));
-let settings = Object.assign({ key: '', cap: 4000, units: 'mi', move: 'move', timer: 0, hard: false, liveMove: 'move', liveTimer: 60, liveHard: false },
+let settings = Object.assign({ key: '', cap: 4000, units: 'mi', timer: 0, hard: false, liveTimer: 60, liveHard: false },
   pick(LS.get('gc:settings', {}), SHARED_KEYS), pick(LS.get('nt:settings', {}), OWN_KEYS));
 const LIVE_TIMERS = [0, 30, 60, 90, 120, 150, 180, 300];
 const timerName = t => !t ? 'No timer' : t < 60 ? t + 's' : t % 60 ? Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0') + ' min' : (t / 60) + ' min';
@@ -353,20 +358,20 @@ function nearestTeam(p) {
   for (const t of TEAMS) { const km = distKm(p, t); if (km < bestKm) { bestKm = km; best = t.code; } }
   return best;
 }
-// A random Google-owned outdoor pano within ~10 miles of the team's arena, and closer to it than to any other
+// near = easy mode: a pano within 300 m of the arena (outdoor only, so never inside it), facing directly away from it (140-180 degrees off the arena's direction).
+// Otherwise (hard mode + Daily): a random Google-owned outdoor pano within ~3 miles of the team's arena, and closer to it than to any other
 // team's arena (so New York / New Jersey and LA / Anaheim spots are never a coin flip).
-// Hard mode: a pano within 300 m of the arena (outdoor only, so never inside it), facing directly away from it (140-180 degrees off the arena's direction).
-async function findTeamSpot(rng, team, hard) {
+async function findTeamSpot(rng, team, near) {
   if (typeof team === 'string') team = TEAM[team];
   for (let i = 0; i < 30; i++) {
-    const location = offsetPoint(team, (hard ? HARD_START_KM : SPOT_KM) * Math.sqrt(rng()), rng() * 360);
+    const location = offsetPoint(team, (near ? NEAR_START_KM : SPOT_KM) * Math.sqrt(rng()), rng() * 360);
     try {
-      const { data } = await sv.getPanorama({ location, radius: hard ? 150 : 2000, preference: 'nearest', sources: [G.StreetViewSource.GOOGLE, G.StreetViewSource.OUTDOOR] });   // Google-owned AND outdoor (sources combine as "must match all")
+      const { data } = await sv.getPanorama({ location, radius: near ? 150 : 1000, preference: 'nearest', sources: [G.StreetViewSource.GOOGLE, G.StreetViewSource.OUTDOOR] });   // Google-owned AND outdoor (sources combine as "must match all")
       const loc = data && data.location;
       if (!loc || !loc.pano) continue;
       const spot = { lat: loc.latLng.lat(), lng: loc.latLng.lng() };
-      if (hard) {
-        if (distKm(spot, team) > HARD_MAX_KM) continue;   // too far from the arena: try again
+      if (near) {
+        if (distKm(spot, team) > NEAR_MAX_KM) continue;   // too far from the arena: try again
         const heading = (bearing(spot, team) + 180 + (rng() * 80 - 40) + 360) % 360;
         return { pano: loc.pano, lat: spot.lat, lng: spot.lng, heading, ans: team.code, pick: null, pts: null };
       }
@@ -378,11 +383,11 @@ async function findTeamSpot(rng, team, hard) {
 }
 // 5 different teams, then one spot for each. A team with no fair Street View is skipped for the next team
 // in the (seeded) order, so Daily still gets 5 teams and stays the same on every device.
-async function makeRounds(rng, hard) {
+async function makeRounds(rng, near) {
   const rounds = []; let lastErr;
   for (const t of shuffle(TEAMS, rng)) {
     if (rounds.length >= ROUNDS) break;
-    try { rounds.push(await findTeamSpot(rng, t, hard)); } catch (e) { lastErr = e; }
+    try { rounds.push(await findTeamSpot(rng, t, near)); } catch (e) { lastErr = e; }
   }
   if (rounds.length < ROUNDS) throw lastErr || new Error('Could not find Street View spots. Try again.');
   return rounds;
@@ -397,7 +402,7 @@ function save() {
 }
 function modeLabel() {
   if (game.mode === 'daily') return `Daily · ${niceDate(game.key)}`;
-  const base = game.hard ? `Hard · NMPZ · ${game.timer}s` : `${MOVES[game.move]}${game.timer ? ' · ' + game.timer + 's' : ''}`;
+  const base = game.hard ? `Hard · ${game.timer}s` : `Easy${game.timer ? ' · ' + game.timer + 's' : ''}`;
   return game.mode === 'chal' ? '⚔ Challenge · ' + base : game.mode === 'live' ? 'Live · ' + base : base;
 }
 async function boot() {
@@ -419,9 +424,9 @@ async function startDaily() {
   if (saved) { game = saved; return resume(); }
   showMsg('Finding today\'s 5 teams…');
   let rounds;
-  try { rounds = await makeRounds(mulberry32(hash('ntt-' + key)), false); }   // Daily is always normal mode
+  try { rounds = await makeRounds(mulberry32(hash('ntt-' + key)), false); }   // Daily: hard-mode spots (up to 3 miles), but no timer
   catch (e) { showMsg(esc(e.message)); return; }
-  game = { mode: 'daily', key, hard: false, move: 'move', timer: 0, rounds, idx: 0, phase: 'play' };
+  game = { mode: 'daily', key, hard: false, near: false, move: MOVE, timer: 0, rounds, idx: 0, phase: 'play' };
   save(); resume();
 }
 async function startUnlimited(fresh) {
@@ -433,9 +438,9 @@ async function startUnlimited(fresh) {
   showMsg('Finding 5 teams…');
   const hard = !!settings.hard;
   let rounds;
-  try { rounds = await makeRounds(mulberry32((Math.random() * 2 ** 32) >>> 0), hard); }
+  try { rounds = await makeRounds(mulberry32((Math.random() * 2 ** 32) >>> 0), !hard); }
   catch (e) { showMsg(esc(e.message)); return; }
-  game = { mode: 'unl', key: 'unl', hard, move: hard ? 'nmpz' : settings.move, timer: hard ? HARD_TIMER : +settings.timer, rounds, idx: 0, phase: 'play' };
+  game = { mode: 'unl', key: 'unl', hard, near: !hard, move: MOVE, timer: hard ? HARD_TIMER : +settings.timer, rounds, idx: 0, phase: 'play' };
   save(); resume();
 }
 function resume() {
@@ -482,8 +487,8 @@ $('#teamFilter').onkeydown = e => {   // Enter with one team left picks it; Ente
   else if (chosen) makeGuess(false);
 };
 
-// hard mode starts zoomed in (a narrower view), so a big arena near the edge of the frame is less likely to show
-const roundZoom = () => game.hard ? 1 : 0;
+// easy mode starts zoomed in (a narrower view), so a big arena near the edge of the frame is less likely to show
+const roundZoom = () => game.near ? 1 : 0;
 function showRound() {
   if (overCap()) { showCapMsg(); return; }
   const r = game.rounds[game.idx];
@@ -492,18 +497,32 @@ function showRound() {
   $('#mapBox').classList.remove('on');
   $('#picker').hidden = false; $('#picker').classList.remove('open'); $('#pickToggle').hidden = false;
   $('#teamFilter').value = ''; applyFilter(); selectTeam(null);
-  const nm = game.move !== 'move', nmpz = game.move === 'nmpz';
+  // no walking: no arrows, no click-to-go. Easy mode keeps its narrow zoom so the view can't widen toward the arena.
   const opts = { pano: r.pano, pov: { heading: r.heading, pitch: 0 }, zoom: roundZoom(), visible: true,
     addressControl: false, showRoadLabels: false, fullscreenControl: false, motionTracking: false, motionTrackingControl: false, enableCloseButton: false,
-    linksControl: !nm, clickToGo: !nm, scrollwheel: !nmpz, zoomControl: !nmpz, panControl: true };
+    linksControl: false, clickToGo: false, scrollwheel: !game.near, zoomControl: !game.near, panControl: true };
   if (!pano) {
     pano = new G.StreetViewPanorama($('#pano'), opts);
-    pano.addListener('pano_changed', () => { if (game && game.phase === 'play' && game.move !== 'move' && pano.getPano() !== game.rounds[game.idx].pano) pano.setPano(game.rounds[game.idx].pano); });
+    pano.addListener('pano_changed', () => { if (game && game.phase === 'play' && pano.getPano() !== game.rounds[game.idx].pano) pano.setPano(game.rounds[game.idx].pano); });
+    pano.addListener('pov_changed', keepFacingAway);
   } else { pano.setOptions(opts); }
   bump('panos');
-  $('#block').classList.toggle('on', nmpz);
-  $('#backBtn').hidden = nmpz;
+  $('#block').classList.remove('on');
+  $('#backBtn').hidden = false;
   startTimer();
+}
+// easy mode: if a turn would point the view at the arena, stop it at the edge of the allowed range
+function awayHeading(heading, toArena) {
+  const d = ((heading - toArena) % 360 + 540) % 360 - 180;   // -180..180, 0 = looking straight at the arena
+  if (Math.abs(d) >= AWAY_MIN_OFF) return null;
+  return ((toArena + (d < 0 ? -AWAY_MIN_OFF : AWAY_MIN_OFF)) % 360 + 360) % 360;
+}
+function keepFacingAway() {
+  if (!game || !game.near || game.phase !== 'play') return;
+  const r = game.rounds[game.idx], t = has(TEAM, r.ans) ? TEAM[r.ans] : null;
+  if (!t) return;
+  const pov = pano.getPov(), h = awayHeading(pov.heading, bearing(r, t));
+  if (h !== null) pano.setPov({ heading: h, pitch: pov.pitch });
 }
 function startTimer() {
   clearInterval(timerId);
@@ -582,7 +601,7 @@ function showFinal() {
   $('#eHome').onclick = showHome;
 }
 function shareText() {
-  const label = game.mode === 'daily' ? game.key : (game.mode === 'chal' ? 'Challenge · ' : '') + (game.hard ? 'Hard' : MOVES[game.move]);
+  const label = game.mode === 'daily' ? game.key : (game.mode === 'chal' ? 'Challenge · ' : '') + (game.hard ? 'Hard' : 'Unlimited');
   return `Name That Team ${label}\n${total().toLocaleString()} / 25,000\n${game.rounds.map(r => r.pts > 0 ? '🟩' : '🟥').join('')}`;
 }
 async function copy(t) {
@@ -624,9 +643,8 @@ function openSettings(first) {
   <label>Google Maps API key (shared with Geo Clue)</label><input id="sKey" value="${esc(settings.key === serverKey ? '' : settings.key)}" placeholder="${serverKey ? 'Using the key from your Vercel settings ✓' : 'AIza…'}" autocomplete="off">
   <p class="help" style="margin:4px 0 0">Saves as soon as you paste it.</p>
   <label>Your name (shown in challenges and live rooms, shared with Geo Clue)</label><input id="sName" maxlength="24" value="${esc(settings.name || '')}" autocomplete="off">
-  <label style="display:flex;gap:8px;align-items:center;cursor:pointer;color:var(--text)"><input type="checkbox" id="sHard" style="width:auto" ${settings.hard ? 'checked' : ''}> <span><b>Unlimited: hard mode</b> <span class="help">· right outside the arena, facing away, NMPZ, 25 s. Daily is always normal.</span></span></label>
+  <label style="display:flex;gap:8px;align-items:center;cursor:pointer;color:var(--text)"><input type="checkbox" id="sHard" style="width:auto" ${settings.hard ? 'checked' : ''}> <span><b>Unlimited: hard mode</b> <span class="help">· up to 3 miles from the rink, 25 s. Off = easy: right outside the rink, facing away; you can turn but never toward the rink. Daily uses hard-mode spots with no timer.</span></span></label>
   <div class="grid2">
-    <div id="sMoveBox" ${settings.hard ? 'hidden' : ''}><label>Unlimited: movement</label><select id="sMove">${Object.entries(MOVES).map(([k, n]) => `<option value="${k}" ${k === settings.move ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
     <div id="sTimerBox" ${settings.hard ? 'hidden' : ''}><label>Unlimited: round timer</label><select id="sTimer">${[0, 30, 60, 120, 180].map(t => `<option value="${t}" ${t === +settings.timer ? 'selected' : ''}>${t ? t + ' seconds' : 'Off'}</option>`).join('')}</select></div>
     <div><label>Distance units</label><select id="sUnits"><option value="mi" ${settings.units === 'mi' ? 'selected' : ''}>Miles</option><option value="km" ${settings.units === 'km' ? 'selected' : ''}>Kilometers</option></select></div>
   </div>
@@ -636,7 +654,7 @@ function openSettings(first) {
     <div class="help" style="margin-top:8px">This browser alone: ${u.panos.toLocaleString()} Street View loads · ${u.maps.toLocaleString()} map loads (all games). Google's exact total is in Google Cloud Console → Google Maps Platform → Metrics.</div></div>
   <div class="btns" style="margin-top:14px;justify-content:flex-start"><button class="primary" id="sSave">Save</button></div>`);
   loadShared().then(renderMeters);
-  $('#sHard').onchange = () => { $('#sMoveBox').hidden = $('#sTimerBox').hidden = $('#sHard').checked; };
+  $('#sHard').onchange = () => { $('#sTimerBox').hidden = $('#sHard').checked; };
   const keyAtOpen = settings.key;
   const readKey = () => $('#sKey').value.trim() || serverKey;
   $('#sKey').oninput = () => { settings.key = readKey(); saveSettings(); };
@@ -644,7 +662,7 @@ function openSettings(first) {
     const newKey = readKey();
     if (!newKey) { toast('Enter an API key'); return; }
     const keyChanged = newKey !== keyAtOpen;
-    Object.assign(settings, { key: newKey, name: $('#sName').value.trim(), move: $('#sMove').value, timer: +$('#sTimer').value, hard: $('#sHard').checked, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
+    Object.assign(settings, { key: newKey, name: $('#sName').value.trim(), timer: +$('#sTimer').value, hard: $('#sHard').checked, units: $('#sUnits').value, cap: Math.max(100, Math.min(5000, +$('#sCap').value || 4000)) });
     saveSettings(); closeModal();
     if (keyChanged && G) { location.reload(); return; }
     if (first) startDaily();
@@ -662,10 +680,10 @@ function setupSteps() {
 }
 function openHelp() {
   openModal(`<h2>How to play</h2><div class="help">
-  <p>You're dropped on a street within about 10 miles of an NHL arena. Look around for clues (signs, skyline, sports bars, license plates) then pick which of the 32 teams plays there. Type in the box to find a team fast.</p>
-  <p>Right team = <b>5,000</b> points, wrong = 0. 5 rounds, 5 different teams per game. Every spot is closer to its own team's arena than to any other, so New York and LA spots are fair.</p>
-  <p><b>Daily</b>: same 5 teams for everyone each day, moving allowed, no timer.<br><b>Unlimited</b>: pick a movement rule and timer, or turn on <b>Hard mode</b>: you start within about 300 m of the arena, facing away from it, with no moving, panning or zooming and 25 seconds. A timeout scores 0.</p>
-  <p><b>Moving</b> = walk around · <b>No move</b> = look around only · <b>NMPZ</b> = no moving, panning or zooming.</p>
+  <p>You're dropped on a street near an NHL rink. Look around for clues (signs, skyline, sports bars, license plates) then pick which of the 32 teams plays there. Type in the box to find a team fast.</p>
+  <p>Right team = <b>5,000</b> points, wrong = 0. 5 rounds, 5 different teams per game. Every spot is closer to its own team's rink than to any other, so New York and LA spots are fair.</p>
+  <p>You can look around, but you can't walk to another spot.</p>
+  <p><b>Easy</b> (normal): you start right outside the rink, facing away. You can turn, but never toward the rink, and you can't zoom out. Pick a timer or play with none.<br><b>Hard mode</b>: anywhere up to 3 miles from the rink, look freely, 25 seconds per round. A timeout scores 0.<br><b>Daily</b>: same 5 teams for everyone each day, hard-mode spots (up to 3 miles), no timer.</p>
   <p><b>⚔ Challenge links</b>: finish any game and send the link. Friends play the same 5 spots whenever they like and see the leaderboard.<br><b>🎮 Live rooms</b>: create a room, share the 4-letter code, and everyone plays the same rounds at the same time, with everyone's picks shown after each round. Up to 10 players.</p>
   <p>Press Space/Enter to guess or go to the next round. ⟲ Start returns to where you began.</p></div>`);
 }
@@ -683,7 +701,7 @@ $('#bSettings').onclick = () => openSettings(!settings.key);
 function homeOn() { return $('#home').classList.contains('on'); }
 function showHome() { clearInterval(timerId); if (live) leaveRoom(); $('#endS').classList.remove('on'); renderHome(); $('#home').classList.add('on'); $('#home').scrollTop = 0; }
 function hideHome() { $('#home').classList.remove('on'); $('#endS').classList.remove('on'); }
-function unlMatches(g) { return g && g.phase !== 'final' && (settings.hard ? g.hard === true : !g.hard && g.move === settings.move && g.timer === +settings.timer); }
+function unlMatches(g) { return g && g.phase !== 'final' && g.move === MOVE && typeof g.near === 'boolean' && (settings.hard ? g.hard === true : !g.hard && g.timer === +settings.timer); }
 function renderHome() {
   const today = dateKey(new Date()), g = LS.get('nt:g:' + today, null);
   let status, icon = '🏒', label;
@@ -696,10 +714,8 @@ function renderHome() {
   if (pendingRoom && !$('#hCode').value) $('#hCode').value = pendingRoom;
   $('#hDaily').textContent = label;
   const fill = (id, entries, val) => { $(id).innerHTML = entries.map(([k, n]) => `<option value="${k}" ${String(k) === String(val) ? 'selected' : ''}>${n}</option>`).join(''); };
-  fill('#hMove', Object.entries(MOVES), settings.move);
   fill('#hTimer', [0, 30, 60, 120, 180].map(t => [t, t ? `⏱ ${t}s` : 'No timer']), settings.timer);
   $('#hHard').checked = !!settings.hard; $('#hOpts').hidden = !!settings.hard;
-  fill('#lMove', Object.entries(MOVES), settings.liveMove);
   fill('#lTimer', LIVE_TIMERS.map(t => [t, '⏱ ' + timerName(t)]), settings.liveTimer);
   $('#lHard').checked = !!settings.liveHard; $('#lOpts').hidden = !!settings.liveHard;
   $('#hUnl').textContent = unlMatches(LS.get('nt:g:unl', null)) ? 'Continue Unlimited game' : 'Play Unlimited';
@@ -711,15 +727,9 @@ function renderMeters() {
   $('#hUsage').innerHTML = settings.key ? meterHTML() : '';
   if ($('#sMeter')) $('#sMeter').innerHTML = meterHTML();
 }
-['#hMove', '#hTimer'].forEach(id => $(id).onchange = () => {
-  Object.assign(settings, { move: $('#hMove').value, timer: +$('#hTimer').value });
-  saveSettings(); renderHome();
-});
+$('#hTimer').onchange = () => { settings.timer = +$('#hTimer').value; saveSettings(); renderHome(); };
 $('#hHard').onchange = () => { settings.hard = $('#hHard').checked; saveSettings(); renderHome(); };
-['#lMove', '#lTimer'].forEach(id => $(id).onchange = () => {
-  Object.assign(settings, { liveMove: $('#lMove').value, liveTimer: +$('#lTimer').value });
-  saveSettings();
-});
+$('#lTimer').onchange = () => { settings.liveTimer = +$('#lTimer').value; saveSettings(); };
 $('#lHard').onchange = () => { settings.liveHard = $('#lHard').checked; saveSettings(); renderHome(); };
 const needKey = fn => () => { if (!settings.key) { openSettings(true); return; } fn(); };
 $('#hDaily').onclick = needKey(() => startDaily());
@@ -746,7 +756,7 @@ function askName(cb) {
   const go = () => { const v = $('#nmIn').value.trim(); if (!v) { toast('Enter a name'); return; } settings.name = v; saveSettings(); closeModal(); cb(v); };
   $('#nmOk').onclick = go; $('#nmIn').onkeydown = e => { if (e.key === 'Enter') go(); }; $('#nmIn').focus();
 }
-const ruleLabel = (hard, move, timer) => hard ? `Hard · NMPZ · ⏱ ${HARD_TIMER}s` : `${has(MOVES, move) ? MOVES[move] : 'Moving'}${timer ? ' · ⏱ ' + timerName(timer) : ''}`;
+const ruleLabel = (hard, move, timer) => hard ? `Hard · up to 3 miles from the rink · ⏱ ${HARD_TIMER}s` : `Easy · right outside the rink, facing away${timer ? ' · ⏱ ' + timerName(timer) : ''}`;
 
 // ---------- challenge links: ?c=<base64url JSON> {v:1, g:'ntt', h:0|1, m, t, r:[[pano, heading, ans]×5], s:[[name,[pts×5]],…]} ----------
 function b64e(o) { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
@@ -763,7 +773,7 @@ function readUrl() {
       if (typeof g !== 'string') throw 0;
       if (g !== 'ntt') { if (!has(GAME_PAGES, g)) throw 0; goPage(GAME_PAGES[g] + location.search); return; }
       if (!ch.r.every(x => Array.isArray(x) && typeof x[0] === 'string' && has(TEAM, x[2]))) throw 0;   // unknown team = broken link
-      ch.m = has(MOVES, ch.m) ? ch.m : 'move';
+      ch.m = MOVE;   // every Name That Team game is look-around-only, whatever the link says
       ch.t = Math.max(0, Math.min(600, Math.round(+ch.t || 0)));
       // scores come from whoever made the link: keep only [name, 5 numbers 0-5000] entries
       ch.s = (Array.isArray(ch.s) ? ch.s : []).filter(x => Array.isArray(x) && Array.isArray(x[1]) && x[1].length === ROUNDS)
@@ -808,7 +818,7 @@ async function startChallenge(ch) {
     }
   } catch (e) { showMsg('Couldn\'t load one of the challenge spots. The link may be broken or the imagery was removed.'); return; }
   const hard = ch.h === 1;
-  game = { mode: 'chal', key: 'chal', cid, hard, move: hard ? 'nmpz' : ch.m, timer: hard ? HARD_TIMER : ch.t,   // m and t cleaned in readUrl
+  game = { mode: 'chal', key: 'chal', cid, hard, near: !hard, move: MOVE, timer: hard ? HARD_TIMER : ch.t,   // t cleaned in readUrl
     rounds, idx: 0, phase: 'play', chal: { s: ch.s } };
   save(); resume();
 }
@@ -859,11 +869,11 @@ function createRoom() {
     const hard = !!settings.liveHard;
     showMsg('Finding 5 teams…');
     let rounds;
-    try { rounds = await makeRounds(mulberry32((Math.random() * 2 ** 32) >>> 0), hard); }
+    try { rounds = await makeRounds(mulberry32((Math.random() * 2 ** 32) >>> 0), !hard); }
     catch (e) { showMsg(esc(e.message)); return; }
     try {
       live = { code: null };
-      const j = await api('create', { settings: { game: 'ntt', hard, move: hard ? 'nmpz' : settings.liveMove, timer: hard ? HARD_TIMER : +settings.liveTimer },
+      const j = await api('create', { settings: { game: 'ntt', hard, move: MOVE, timer: hard ? HARD_TIMER : +settings.liveTimer },
         rounds: rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, ans: r.ans })) });
       enterRoom(j.code);
     } catch (e) { live = null; showHome(); apiError(e); }
@@ -909,7 +919,7 @@ function roundOver(d) {
 }
 function setupLiveGame(room) {
   const hard = room.settings.hard === true;
-  game = { mode: 'live', key: 'live', code: room.code, hard, move: hard ? 'nmpz' : room.settings.move, timer: hard ? HARD_TIMER : room.settings.timer,
+  game = { mode: 'live', key: 'live', code: room.code, hard, near: !hard, move: MOVE, timer: hard ? HARD_TIMER : room.settings.timer,
     rounds: room.rounds.map(r => ({ pano: r.pano, heading: r.heading, lat: r.lat, lng: r.lng, ans: r.ans, pick: null, pts: null })), idx: room.round, phase: 'play' };
   live.round = -1;
 }
@@ -1018,19 +1028,18 @@ function renderLobby(d) {
     <div style="display:flex;gap:6px;margin:10px 0 16px"><input readonly value="${esc(link)}" id="lbLink"><button id="lbCopy">Copy invite</button></div>
     <div class="today" style="display:block"><b>Players (${ids.length}/10)</b>
       <div class="rounds" style="margin:8px 0 0">${ids.map((id, i) => `<div><span><span style="color:${COLORS[i % COLORS.length]}">●</span> ${esc(d.players[id].name)}${id === room.hostId ? ' 👑' : ''}${id === sessId() ? ' (you)' : ''}</span></div>`).join('')}</div></div>
-    ${host && !hard ? `<div class="grid2" style="text-align:left;margin:0 0 6px">
-        <div><div class="help">Movement</div><select id="lbMove">${opt(Object.entries(MOVES), room.settings.move)}</select></div>
+    ${host && !hard ? `<div style="text-align:left;margin:0 0 6px">
         <div><div class="help">Round timer</div><select id="lbTimer">${opt(LIVE_TIMERS.map(t => [t, timerName(t)]), room.settings.timer)}</select></div></div>
       <p class="help">5 rounds · 5 teams</p>`
-    : `<p class="help">${hard ? '<b>Hard mode</b> · right outside the arena, facing away · NMPZ · ⏱ ' + HARD_TIMER + 's per round' : ruleLabel(false, room.settings.move, room.settings.timer)} · 5 rounds</p>`}
+    : `<p class="help">${hard ? '<b>Hard mode</b> · up to 3 miles from the rink · ⏱ ' + HARD_TIMER + 's per round' : ruleLabel(false, room.settings.move, room.settings.timer)} · 5 rounds</p>`}
     <div class="hbtns">${host ? `<button class="primary" id="lbStart">Start game · ${ids.length} player${ids.length > 1 ? 's' : ''}</button>` : '<button disabled>Waiting for the host to start…</button>'}
       <button id="lbLeave">Leave room</button></div>`;
   $('#lobby').classList.add('on');
   $('#lbCopy').onclick = () => copy(link);
   $('#lbLink').onclick = e => e.target.select();
   if ($('#lbStart')) $('#lbStart').onclick = () => { $('#lbStart').disabled = true; api('start').then(pollRoom).catch(apiError); };
-  const pushSettings = () => api('settings', { settings: { move: $('#lbMove').value, timer: +$('#lbTimer').value } }).then(pollRoom).catch(apiError);
-  if ($('#lbMove')) { $('#lbMove').onchange = pushSettings; $('#lbTimer').onchange = pushSettings; }
+  const pushSettings = () => api('settings', { settings: { timer: +$('#lbTimer').value } }).then(pollRoom).catch(apiError);
+  if ($('#lbTimer')) $('#lbTimer').onchange = pushSettings;
   $('#lbLeave').onclick = () => { leaveRoom(); showHome(); };
 }
 $('#hCreate').onclick = needKey(createRoom);
